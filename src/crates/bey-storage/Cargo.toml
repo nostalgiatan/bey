@@ -22,7 +22,7 @@ sha2 = "0.10.9"
 bytes = "1.10.1"
 
 # 压缩相关
-zstd = "0.13"
+zstd = { version = "0.13", default-features = false }
 lz4_flex = "0.11"
 async-compression = { version = "0.4", features = ["zstd"] }
 
@@ -43,6 +43,9 @@ memmap2 = "0.9"
 # 其他工具
 dirs = "5.0"
 async-trait = "0.1"
+sled = { version = "0.34.7", default-features = false }
+hex = { version = "0.4.3", default-features = false }
+uuid = { version = "1.18.1", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3.0"
