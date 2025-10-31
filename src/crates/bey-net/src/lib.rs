@@ -56,6 +56,10 @@
 //! - `state_machine` - 状态机：管理连接状态和转换
 //! - `receiver` - 元接收器：灵活的消息接收机制
 //! - `engine` - 传输引擎：集成所有功能的核心引擎
+//! - `stream` - 流式传输：大文件分块传输和流水线
+//! - `priority_queue` - 优先级队列：令牌优先级排序和确认机制
+//! - `flow_control` - 流量控制：滑动窗口和拥塞控制
+//! - `metrics` - 性能监控：指标收集和统计
 //! - `mdns_discovery` - mDNS设备发现
 //! - `udp_discovery` - UDP广播设备发现
 
@@ -89,6 +93,31 @@ pub use receiver::{
 pub mod engine;
 pub use engine::{
     TransportEngine, EngineConfig,
+};
+
+// 导出流式传输
+pub mod stream;
+pub use stream::{
+    StreamFlag, StreamMeta, StreamChunk, StreamSession, StreamManager,
+};
+
+// 导出优先级队列
+pub mod priority_queue;
+pub use priority_queue::{
+    PriorityQueue, AckStatus,
+};
+
+// 导出流量控制
+pub mod flow_control;
+pub use flow_control::{
+    FlowController, FlowControlStats, CongestionState,
+    RateLimiter,
+};
+
+// 导出性能监控
+pub mod metrics;
+pub use metrics::{
+    Metrics, MetricsCollector, ErrorStats,
 };
 
 // 导出mDNS发现模块
