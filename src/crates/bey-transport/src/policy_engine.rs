@@ -20,6 +20,9 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use tracing::{info, debug, error};
 
+// 使用错误代码常量
+use crate::error_codes::policy as policy_errors;
+
 /// 策略动作类型
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PolicyAction {
@@ -165,7 +168,7 @@ impl PolicyCondition {
             }
             (ConditionOperator::Regex, serde_json::Value::String(actual), serde_json::Value::String(pattern)) => {
                 regex::Regex::new(pattern)
-                    .map_err(|e| ErrorInfo::new(6001, format!("无效的正则表达式: {}", e))
+                    .map_err(|e| ErrorInfo::new(policy_errors::INVALID_REGEX, format!("无效的正则表达式: {}", e))
                         .with_category(ErrorCategory::Configuration)
                         .with_severity(ErrorSeverity::Error))?
                     .is_match(actual)
@@ -690,7 +693,7 @@ impl CompletePolicyEngine {
             info!("策略集合移除完成: {}", policy_set_id);
             Ok(())
         } else {
-            Err(ErrorInfo::new(6002, format!("策略集合不存在: {}", policy_set_id))
+            Err(ErrorInfo::new(policy_errors::POLICY_SET_NOT_FOUND, format!("策略集合不存在: {}", policy_set_id))
                 .with_category(ErrorCategory::Configuration)
                 .with_severity(ErrorSeverity::Warning))
         }
@@ -731,7 +734,7 @@ impl CompletePolicyEngine {
         // 获取策略集合
         let policy_sets = self.policy_sets.read().await;
         let policy_set = policy_sets.get(policy_set_id)
-            .ok_or_else(|| ErrorInfo::new(6003, format!("策略集合不存在: {}", policy_set_id))
+            .ok_or_else(|| ErrorInfo::new(policy_errors::POLICY_EVALUATION_FAILED, format!("策略集合不存在: {}", policy_set_id))
                 .with_category(ErrorCategory::Configuration)
                 .with_severity(ErrorSeverity::Error))?;
 
@@ -907,7 +910,7 @@ impl CompletePolicyEngine {
             info!("策略集合 {} 已{}", policy_set_id, if enabled { "启用" } else { "禁用" });
             Ok(())
         } else {
-            Err(ErrorInfo::new(6004, format!("策略集合不存在: {}", policy_set_id))
+            Err(ErrorInfo::new(policy_errors::POLICY_SET_OPERATION_FAILED, format!("策略集合不存在: {}", policy_set_id))
                 .with_category(ErrorCategory::Configuration)
                 .with_severity(ErrorSeverity::Warning))
         }

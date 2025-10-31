@@ -15,7 +15,6 @@
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use quinn::crypto::rustls::{QuicServerConfig, QuicClientConfig};
 use rustls::{pki_types::CertificateDer, RootCertStore};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -24,60 +23,11 @@ use tracing::{info, debug};
 // 完全依赖证书管理模块
 use bey_identity::{CertificateManager, CertificateData};
 
-/// mTLS配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MtlsConfig {
-    /// 是否启用mTLS
-    pub enabled: bool,
-    /// 证书存储目录
-    pub certificates_dir: std::path::PathBuf,
-    /// 是否启用配置缓存
-    pub enable_config_cache: bool,
-    /// 配置缓存TTL
-    pub config_cache_ttl: Duration,
-    /// 最大配置缓存数量
-    pub max_config_cache_entries: usize,
-    /// 设备ID前缀
-    pub device_id_prefix: String,
-    /// 组织名称
-    pub organization_name: String,
-    /// 国家代码
-    pub country_code: String,
-}
+// 使用mtls模块中的配置类型
+pub use crate::mtls::{MtlsConfig, MtlsStats};
 
-impl Default for MtlsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            certificates_dir: std::path::PathBuf::from("./certs"),
-            enable_config_cache: true,
-            config_cache_ttl: Duration::from_secs(3600), // 1小时
-            max_config_cache_entries: 100,
-            device_id_prefix: "bey".to_string(),
-            organization_name: "BEY".to_string(),
-            country_code: "CN".to_string(),
-        }
-    }
-}
-
-/// mTLS统计信息
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MtlsStats {
-    /// 配置生成次数
-    pub config_generations: u64,
-    /// 配置缓存命中次数
-    pub config_cache_hits: u64,
-    /// 配置缓存未命中次数
-    pub config_cache_misses: u64,
-    /// 证书轮换次数
-    pub certificate_renewals: u64,
-    /// 证书验证次数
-    pub certificate_verifications: u64,
-    /// 连接建立次数
-    pub connections_established: u64,
-    /// 连接失败次数
-    pub connection_failures: u64,
-}
+// 使用错误代码常量
+use crate::error_codes::mtls as mtls_errors;
 
 /// 完整的mTLS管理器
 pub struct CompleteMtlsManager {
@@ -113,14 +63,14 @@ impl CompleteMtlsManager {
             .with_country_code(&config.country_code)
             .with_storage_directory(&config.certificates_dir)
             .build()
-            .map_err(|e| ErrorInfo::new(5001, format!("创建证书配置失败: {}", e))
+            .map_err(|e| ErrorInfo::new(mtls_errors::CREATE_CERT_CONFIG_FAILED, format!("创建证书配置失败: {}", e))
                 .with_category(ErrorCategory::Configuration)
                 .with_severity(ErrorSeverity::Error))?;
 
         let certificate_manager = Arc::new(
             CertificateManager::initialize(certificate_config)
                 .await
-                .map_err(|e| ErrorInfo::new(5002, format!("初始化证书管理器失败: {}", e))
+                .map_err(|e| ErrorInfo::new(mtls_errors::INIT_CERT_MANAGER_FAILED, format!("初始化证书管理器失败: {}", e))
                     .with_category(ErrorCategory::System)
                     .with_severity(ErrorSeverity::Error))?
         );
@@ -144,7 +94,7 @@ impl CompleteMtlsManager {
     /// 验证配置
     fn validate_config(config: &MtlsConfig) -> Result<(), ErrorInfo> {
         if config.config_cache_ttl.is_zero() {
-            return Err(ErrorInfo::new(5003, "配置缓存TTL必须大于0".to_string())
+            return Err(ErrorInfo::new(mtls_errors::INVALID_CACHE_TTL, "配置缓存TTL必须大于0".to_string())
                 .with_category(ErrorCategory::Configuration)
                 .with_severity(ErrorSeverity::Error));
         }
@@ -459,7 +409,14 @@ impl CompleteMtlsManager {
             if i > 0 {
                 pem.push('\n');
             }
-            pem.push_str(std::str::from_utf8(chunk).unwrap());
+            // base64编码后的数据一定是有效的UTF-8，但为了安全使用match处理
+            match std::str::from_utf8(chunk) {
+                Ok(s) => pem.push_str(s),
+                Err(_) => {
+                    // 这种情况理论上不应该发生，但为了安全跳过这个chunk
+                    continue;
+                }
+            }
         }
 
         pem.push_str("\n-----END CERTIFICATE-----");
