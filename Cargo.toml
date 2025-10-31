@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 default = ["config"]
 gui = ["tauri"]
-tui = ["ratatui", "crossterm"]
+tui = ["bey-tui", "ratatui", "crossterm"]
 config = ["toml"]
 
 [dependencies]
@@ -19,6 +19,7 @@ bey-transport = { path = "src/crates/bey-transport" }
 bey-net = { path = "src/crates/bey-net" }
 bey-func = { path = "src/crates/bey-func" }
 bey-plugin = { path = "src/crates/bey-plugin" }
+bey-tui = { path = "src/crates/bey-tui", optional = true }
 # bey-file-transfer 模块已被移除，其功能已被 bey-net 模块覆盖
 # 如需文件传输功能，请使用 bey-net 模块的 send_large_file() 等API
 # bey-file-transfer = { path = "src/crates/bey-file-transfer" }

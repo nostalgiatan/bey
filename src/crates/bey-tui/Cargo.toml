@@ -1,0 +1,14 @@
+[package]
+name = "bey-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = "0.1.89"
+bey-func = { version = "0.1.0", path = "../bey-func" }
+bey-net = { version = "0.1.0", path = "../bey-net" }
+crossterm = "0.29.0"
+error = { version = "0.1.0", path = "../error" }
+ratatui = "0.29.0"
+tokio = { version = "1.48.0", features = ["full"] }
+tracing = "0.1.41"

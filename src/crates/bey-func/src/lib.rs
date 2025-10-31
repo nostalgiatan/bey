@@ -113,10 +113,11 @@ impl BeyFuncManager {
     /// 返回管理器实例或错误
     pub async fn new(device_id: &str, storage_root: &str) -> FuncResult<Self> {
         // 初始化网络引擎
-        let engine_config = bey_net::EngineConfig {
+        let mut engine_config = bey_net::EngineConfig {
             name: device_id.to_string(),
             ..Default::default()
         };
+        engine_config.enable_encryption = false;  // 暂时禁用加密以便测试
         let engine = bey_net::TransportEngine::new(engine_config).await
             .map_err(|e| ErrorInfo::new(7001, format!("创建网络引擎失败: {}", e))
                 .with_category(ErrorCategory::Network)
@@ -311,6 +312,11 @@ impl BeyFuncManager {
     /// 获取设备ID
     pub fn device_id(&self) -> &str {
         &self.device_id
+    }
+
+    /// 获取网络引擎
+    pub fn engine(&self) -> &bey_net::TransportEngine {
+        &self.engine
     }
 }
 

@@ -110,7 +110,7 @@ impl BeyAppManager {
         let mut net_config = bey_net::engine::EngineConfig::default();
         net_config.name = device_id.clone();
         net_config.port = self.config.network_port;
-        net_config.enable_encryption = true;
+        net_config.enable_encryption = false;  // 暂时禁用加密以便测试
 
         let net_engine = bey_net::engine::TransportEngine::new(net_config).await
             .map_err(|e| ErrorInfo::new(2002, format!("初始化网络引擎失败: {:?}", e)))?;
@@ -212,8 +212,8 @@ impl BeyAppManager {
     }
 
     /// 获取功能管理器
-    pub fn func_manager(&self) -> Option<Arc<bey_func::BeyFuncManager>> {
-        self.func_manager.clone()
+    pub fn func_manager(&self) -> Arc<bey_func::BeyFuncManager> {
+        self.func_manager.clone().expect("功能管理器未初始化")
     }
 
     /// 获取插件管理器
