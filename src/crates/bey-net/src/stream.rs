@@ -135,7 +135,8 @@ pub enum StreamState {
 
 /// 流会话
 pub struct StreamSession {
-    /// 流ID
+    /// 流ID (未使用，但保留用于调试)
+    #[allow(dead_code)]
     stream_id: String,
     /// 流元数据
     meta: StreamMeta,
@@ -145,7 +146,8 @@ pub struct StreamSession {
     received_chunks: HashMap<usize, Vec<u8>>,
     /// 接收的块数
     received_count: usize,
-    /// 创建时间
+    /// 创建时间 (未使用，但保留用于调试)
+    #[allow(dead_code)]
     created_at: std::time::SystemTime,
     /// 最后活跃时间
     last_active: std::time::SystemTime,

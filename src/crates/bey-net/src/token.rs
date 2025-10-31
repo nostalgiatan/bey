@@ -236,7 +236,7 @@ pub trait TokenHandler: Send + Sync {
     /// # 返回值
     ///
     /// 返回验证结果
-    async fn validate_token(&self, token: &Token) -> NetResult<bool> {
+    async fn validate_token(&self, _token: &Token) -> NetResult<bool> {
         // 默认实现：始终验证通过
         Ok(true)
     }

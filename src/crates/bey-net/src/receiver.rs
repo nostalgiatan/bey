@@ -281,7 +281,7 @@ impl MetaReceiver for BufferedReceiver {
         }
     }
 
-    async fn receive_batch(&self, max_count: usize, mode: ReceiverMode) -> NetResult<Vec<Token>> {
+    async fn receive_batch(&self, max_count: usize, _mode: ReceiverMode) -> NetResult<Vec<Token>> {
         let mut tokens = Vec::with_capacity(max_count);
 
         // 先从缓冲区获取

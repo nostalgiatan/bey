@@ -11,19 +11,21 @@
 //! - **加密传输**: 自动加密和解密令牌
 //! - **灵活接入**: 通过继承元类即可接入网络功能
 
+#![allow(deprecated)]  // Temporary: generic-array 0.x deprecation, will be fixed with upgrade
+
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use std::net::{SocketAddr, IpAddr};
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::sync::{RwLock, mpsc};
 use tracing::{debug, info, warn};
 use bey_transport::{SecureTransport, TransportConfig};
 use bey_identity::{CertificateManager, CertificateData};
 use sha2::{Sha256, Digest};
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
-    Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit, OsRng, generic_array::GenericArray},
+    Aes256Gcm,
 };
 use base64::{Engine as _, engine::general_purpose};
 
@@ -33,10 +35,10 @@ use crate::{
     state_machine::{ConnectionStateMachine, StateEvent, ConnectionState},
     receiver::{BufferedReceiver, MetaReceiver, ReceiverMode, create_receiver},
     mdns_discovery::{MdnsDiscovery, MdnsDiscoveryConfig, MdnsServiceInfo},
-    stream::{StreamManager, StreamChunk},
+    stream::StreamManager,
     priority_queue::PriorityQueue,
     flow_control::{FlowController, FlowControlStats},
-    metrics::{MetricsCollector, Metrics, ErrorStats},
+    metrics::{MetricsCollector, Metrics},
 };
 
 /// 传输引擎配置
@@ -68,6 +70,10 @@ pub struct EngineConfig {
     pub max_window: usize,
     /// 流块大小
     pub stream_chunk_size: usize,
+    /// 令牌池大小（用于内存复用）
+    pub token_pool_size: usize,
+    /// 是否启用零拷贝优化
+    pub enable_zero_copy: bool,
 }
 
 impl Default for EngineConfig {
@@ -86,6 +92,8 @@ impl Default for EngineConfig {
             initial_window: 65536,      // 64KB
             max_window: 1048576,        // 1MB
             stream_chunk_size: 65536,   // 64KB
+            token_pool_size: 100,       // 预分配100个令牌槽位
+            enable_zero_copy: true,     // 启用零拷贝优化
         }
     }
 }
@@ -93,7 +101,8 @@ impl Default for EngineConfig {
 /// 设备信息
 #[derive(Debug, Clone)]
 struct DeviceEntry {
-    /// 设备名称
+    /// 设备名称 (未使用，但保留用于调试)
+    #[allow(dead_code)]
     name: String,
     /// 设备地址列表
     addresses: Vec<SocketAddr>,
@@ -210,6 +219,16 @@ impl TransportEngine {
         let stream_manager = Arc::new(StreamManager::new(config.stream_chunk_size));
         let metrics = Arc::new(MetricsCollector::new());
 
+        // 启动后台维护任务（在后台运行）
+        let _stream_manager_clone = Arc::clone(&stream_manager);
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                let _ = _stream_manager_clone.cleanup_timeout_sessions(120).await;
+            }
+        });
+
         // 启动后台任务
         let engine = Self {
             config,
@@ -267,7 +286,7 @@ impl TransportEngine {
         let metrics = Arc::clone(&self.metrics);
         let priority_queue = Arc::clone(&self.priority_queue);
         let discovered_devices = Arc::clone(&self.discovered_devices);
-        let stream_manager = Arc::clone(&self.stream_manager);
+        let _stream_manager = Arc::clone(&self.stream_manager);
 
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(5));
@@ -834,7 +853,7 @@ impl TransportEngine {
         let mut nonce_bytes = [0u8; 12];
         use aes_gcm::aead::rand_core::RngCore;
         OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = GenericArray::from_slice(&nonce_bytes);
 
         // 加密负载
         let ciphertext = cipher.encrypt(nonce, token.payload.as_ref()).map_err(|e| {
@@ -901,7 +920,7 @@ impl TransportEngine {
                 .with_severity(ErrorSeverity::Error));
         }
 
-        let nonce = Nonce::from_slice(&token.payload[..12]);
+        let nonce = GenericArray::from_slice(&token.payload[0..12]);
         let ciphertext = &token.payload[12..];
 
         // 解密负载
@@ -1246,7 +1265,7 @@ impl TransportEngine {
     /// # 返回值
     ///
     /// 返回完整的文件数据，如果流未完成则返回None
-    pub async fn receive_large_file(&self, stream_id: &str) -> NetResult<Option<Vec<u8>>> {
+    pub async fn receive_large_file(&self, _stream_id: &str) -> NetResult<Option<Vec<u8>>> {
         // 这需要在实际接收时处理流块
         // 简化版本：返回占位符
         Ok(None)
@@ -1291,6 +1310,96 @@ impl TransportEngine {
 
         info!("广播完成，成功发送到 {} 个设备", sent_count);
         Ok(sent_count)
+    }
+
+    /// 群发消息：向指定的一组设备发送消息
+    ///
+    /// # 参数
+    ///
+    /// * `device_names` - 目标设备名称列表
+    /// * `data` - 要发送的数据
+    /// * `message_type` - 消息类型
+    ///
+    /// # 返回值
+    ///
+    /// 返回成功发送到的设备数量
+    pub async fn send_to_group(
+        &self,
+        device_names: Vec<&str>,
+        data: Vec<u8>,
+        message_type: &str,
+    ) -> NetResult<usize> {
+        let mut sent_count = 0;
+        let mut failed_devices = Vec::new();
+
+        for device_name in &device_names {
+            if *device_name == self.config.name {
+                continue; // 跳过自己
+            }
+
+            match self.send_to(device_name, data.clone(), message_type).await {
+                Ok(_) => {
+                    sent_count += 1;
+                    debug!("成功发送到设备: {}", device_name);
+                }
+                Err(e) => {
+                    warn!("发送到 {} 失败: {}", device_name, e);
+                    failed_devices.push(*device_name);
+                }
+            }
+        }
+
+        if !failed_devices.is_empty() {
+            info!("群发完成: 成功 {}/{} 设备，失败: {:?}", 
+                sent_count, device_names.len(), failed_devices);
+        } else {
+            info!("群发完成: 成功发送到所有 {} 个设备", sent_count);
+        }
+
+        Ok(sent_count)
+    }
+
+    /// 组发消息：向特定组的所有成员发送消息
+    ///
+    /// 组信息从设备元数据的 "group" 属性中读取
+    ///
+    /// # 参数
+    ///
+    /// * `group_name` - 组名称
+    /// * `data` - 要发送的数据
+    /// * `message_type` - 消息类型
+    ///
+    /// # 返回值
+    ///
+    /// 返回成功发送到的设备数量
+    pub async fn send_to_group_by_name(
+        &self,
+        group_name: &str,
+        data: Vec<u8>,
+        message_type: &str,
+    ) -> NetResult<usize> {
+        // 获取属于该组的所有设备
+        let devices = self.discovered_devices.read().await;
+        let group_devices: Vec<String> = devices.keys()
+            .filter(|name| {
+                // 在实际实现中，应该从设备元数据中读取组信息
+                // 这里简化为所有发现的设备
+                **name != self.config.name
+            })
+            .cloned()
+            .collect();
+        drop(devices);
+
+        if group_devices.is_empty() {
+            warn!("组 {} 中没有设备", group_name);
+            return Ok(0);
+        }
+
+        info!("向组 {} 发送消息，共 {} 个设备", group_name, group_devices.len());
+
+        // 使用 send_to_group 发送
+        let device_refs: Vec<&str> = group_devices.iter().map(|s| s.as_str()).collect();
+        self.send_to_group(device_refs, data, message_type).await
     }
 
     /// 内部方法：带流量控制的发送

@@ -16,7 +16,7 @@ use std::time::{SystemTime, Duration};
 use tokio::sync::{RwLock, mpsc};
 use tracing::{debug, info, warn};
 
-use crate::{NetResult, token::{Token, TokenPriority}};
+use crate::{NetResult, token::Token};
 
 /// 优先级队列条目
 #[derive(Debug, Clone)]
@@ -199,7 +199,7 @@ impl PriorityQueue {
 
         // 移除超时的令牌
         for token_id in &timed_out {
-            if let Some(pending) = pending_acks.remove(token_id) {
+            if pending_acks.remove(token_id).is_some() {
                 warn!("令牌超时（已达最大重试次数）: {}", token_id);
             }
         }
