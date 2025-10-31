@@ -15,7 +15,6 @@
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use quinn::crypto::rustls::{QuicServerConfig, QuicClientConfig};
 use rustls::{pki_types::CertificateDer, RootCertStore};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -24,60 +23,8 @@ use tracing::{info, debug};
 // 完全依赖证书管理模块
 use bey_identity::{CertificateManager, CertificateData};
 
-/// mTLS配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MtlsConfig {
-    /// 是否启用mTLS
-    pub enabled: bool,
-    /// 证书存储目录
-    pub certificates_dir: std::path::PathBuf,
-    /// 是否启用配置缓存
-    pub enable_config_cache: bool,
-    /// 配置缓存TTL
-    pub config_cache_ttl: Duration,
-    /// 最大配置缓存数量
-    pub max_config_cache_entries: usize,
-    /// 设备ID前缀
-    pub device_id_prefix: String,
-    /// 组织名称
-    pub organization_name: String,
-    /// 国家代码
-    pub country_code: String,
-}
-
-impl Default for MtlsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            certificates_dir: std::path::PathBuf::from("./certs"),
-            enable_config_cache: true,
-            config_cache_ttl: Duration::from_secs(3600), // 1小时
-            max_config_cache_entries: 100,
-            device_id_prefix: "bey".to_string(),
-            organization_name: "BEY".to_string(),
-            country_code: "CN".to_string(),
-        }
-    }
-}
-
-/// mTLS统计信息
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MtlsStats {
-    /// 配置生成次数
-    pub config_generations: u64,
-    /// 配置缓存命中次数
-    pub config_cache_hits: u64,
-    /// 配置缓存未命中次数
-    pub config_cache_misses: u64,
-    /// 证书轮换次数
-    pub certificate_renewals: u64,
-    /// 证书验证次数
-    pub certificate_verifications: u64,
-    /// 连接建立次数
-    pub connections_established: u64,
-    /// 连接失败次数
-    pub connection_failures: u64,
-}
+// 使用mtls模块中的配置类型
+pub use crate::mtls::{MtlsConfig, MtlsStats};
 
 /// 完整的mTLS管理器
 pub struct CompleteMtlsManager {
