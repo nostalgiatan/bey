@@ -12,7 +12,12 @@
 //! - **连接复用**: 支持多路复用和流管理
 //! - **策略引擎**: 集成安全策略管理
 
-// 模块声明
+// 模块声明 - 新的模块化结构
+pub mod pool;
+pub mod policy;
+pub mod mtls;
+
+// 兼容性模块声明 - 保留旧的模块以便逐步迁移
 pub mod mtls_manager;
 pub mod policy_engine;
 
@@ -30,9 +35,14 @@ use bey_identity::CertificateManager;
 use mtls_manager::CompleteMtlsManager;
 use policy_engine::{CompletePolicyEngine, PolicyContext, PolicyAction};
 
-// 类型别名
+// 类型别名和重新导出
 pub type MtlsStats = mtls_manager::MtlsStats;
 pub type PolicyEngineStats = policy_engine::PolicyEngineStats;
+
+// 重新导出新模块的类型
+pub use pool::{CompleteConnectionPoolConfig, LoadBalanceStrategy, CompleteConnectionStats};
+pub use policy::{PolicyAction as PolicyActionType, ConditionOperator};
+pub use mtls::{MtlsConfig};
 
 
 /// 传输消息
