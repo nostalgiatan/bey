@@ -2,13 +2,11 @@
 //!
 //! 测试策略引擎的核心功能，包括条件评估、规则评估、策略集合评估和缓存机制。
 
-use bey_transport::{
+use bey_transport::policy_engine::{
     CompletePolicyEngine, PolicyEngineConfig, PolicySet, PolicyRule, PolicyCondition, PolicyContext,
     PolicyAction, ConditionOperator, PolicySetEvaluationResult,
 };
-use std::collections::HashSet;
 use std::time::Duration;
-use tokio::time::{sleep, TokioDuration};
 
 fn init_logging() {
     tracing_subscriber::fmt()
@@ -21,12 +19,12 @@ fn create_test_context() -> PolicyContext {
         .with_requester_id("user-123".to_string())
         .with_resource("/api/data".to_string())
         .with_operation("read".to_string())
-        .with_field("ip_address".to_string(), serde_json::Value::String("192.168.1.100".to_string()))
-        .with_field("role".to_string(), serde_json::Value::String("admin".to_string()))
-        .with_field("department".to_string(), serde_json::Value::String("engineering".to_string()))
-        .with_field("age".to_string(), serde_json::Value::Number(serde_json::Number::from(25)))
-        .with_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(85)))
-        .with_field("permissions".to_string(), serde_json::Value::Array(vec![
+        .set_field("ip_address".to_string(), serde_json::Value::String("192.168.1.100".to_string()))
+        .set_field("role".to_string(), serde_json::Value::String("admin".to_string()))
+        .set_field("department".to_string(), serde_json::Value::String("engineering".to_string()))
+        .set_field("age".to_string(), serde_json::Value::Number(serde_json::Number::from(25)))
+        .set_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(85)))
+        .set_field("permissions".to_string(), serde_json::Value::Array(vec![
             serde_json::Value::String("read".to_string()),
             serde_json::Value::String("write".to_string()),
         ]))
@@ -166,7 +164,7 @@ async fn test_policy_evaluation_scenarios() {
 
     // 场景1: 管理员用户
     let admin_context = create_test_context()
-        .with_field("role".to_string(), serde_json::Value::String("admin".to_string()));
+        .set_field("role".to_string(), serde_json::Value::String("admin".to_string()));
 
     let result = engine.evaluate("complex-access-control", &admin_context).await.unwrap();
     assert_eq!(result.final_action, PolicyAction::Allow);
@@ -176,7 +174,7 @@ async fn test_policy_evaluation_scenarios() {
 
     // 场景2: 工程部门用户（年龄足够）
     let engineering_context = create_test_context()
-        .with_field("role".to_string(), serde_json::Value::String("developer".to_string()));
+        .set_field("role".to_string(), serde_json::Value::String("developer".to_string()));
 
     let result = engine.evaluate("complex-access-control", &engineering_context).await.unwrap();
     assert_eq!(result.final_action, PolicyAction::Allow);
@@ -186,8 +184,8 @@ async fn test_policy_evaluation_scenarios() {
 
     // 场景3: 高分用户
     let high_score_context = create_test_context()
-        .with_field("role".to_string(), serde_json::Value::String("user".to_string()))
-        .with_field("department".to_string(), serde_json::Value::String("marketing".to_string()));
+        .set_field("role".to_string(), serde_json::Value::String("user".to_string()))
+        .set_field("department".to_string(), serde_json::Value::String("marketing".to_string()));
 
     let result = engine.evaluate("complex-access-control", &high_score_context).await.unwrap();
     assert_eq!(result.final_action, PolicyAction::Allow);
@@ -197,8 +195,8 @@ async fn test_policy_evaluation_scenarios() {
 
     // 场景4: 访客用户（应该被拒绝）
     let guest_context = create_test_context()
-        .with_field("role".to_string(), serde_json::Value::String("guest".to_string()))
-        .with_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(95)));
+        .set_field("role".to_string(), serde_json::Value::String("guest".to_string()))
+        .set_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(95)));
 
     let result = engine.evaluate("complex-access-control", &guest_context).await.unwrap();
     assert_eq!(result.final_action, PolicyAction::Deny);
@@ -208,10 +206,10 @@ async fn test_policy_evaluation_scenarios() {
 
     // 场景5: 普通用户（无匹配规则，使用默认动作）
     let normal_user_context = create_test_context()
-        .with_field("role".to_string(), serde_json::Value::String("user".to_string()))
-        .with_field("department".to_string(), serde_json::Value::String("sales".to_string()))
-        .with_field("age".to_string(), serde_json::Value::Number(serde_json::Number::from(20)))
-        .with_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(60)));
+        .set_field("role".to_string(), serde_json::Value::String("user".to_string()))
+        .set_field("department".to_string(), serde_json::Value::String("sales".to_string()))
+        .set_field("age".to_string(), serde_json::Value::Number(serde_json::Number::from(20)))
+        .set_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(60)));
 
     let result = engine.evaluate("complex-access-control", &normal_user_context).await.unwrap();
     assert_eq!(result.final_action, PolicyAction::Deny); // 默认拒绝
@@ -279,14 +277,14 @@ async fn test_batch_evaluation() {
     // 准备批量评估数据
     let evaluations = vec![
         ("complex-access-control".to_string(), create_test_context()
-            .with_field("role".to_string(), serde_json::Value::String("admin".to_string()))),
+            .set_field("role".to_string(), serde_json::Value::String("admin".to_string()))),
         ("complex-access-control".to_string(), create_test_context()
-            .with_field("role".to_string(), serde_json::Value::String("developer".to_string()))),
+            .set_field("role".to_string(), serde_json::Value::String("developer".to_string()))),
         ("complex-access-control".to_string(), create_test_context()
-            .with_field("role".to_string(), serde_json::Value::String("guest".to_string()))),
+            .set_field("role".to_string(), serde_json::Value::String("guest".to_string()))),
         ("complex-access-control".to_string(), create_test_context()
-            .with_field("role".to_string(), serde_json::Value::String("user".to_string())
-            .with_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(90)))),
+            .set_field("role".to_string(), serde_json::Value::String("user".to_string()))
+            .set_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(90)))),
     ];
 
     // 执行批量评估
@@ -342,8 +340,7 @@ async fn test_performance_benchmarks() {
     let start = std::time::Instant::now();
 
     for i in 0..iterations {
-        let mut test_context = context.clone();
-        test_context.set_field(
+        let test_context = context.clone().set_field(
             "iteration".to_string(),
             serde_json::Value::Number(serde_json::Number::from(i))
         );
@@ -360,7 +357,7 @@ async fn test_performance_benchmarks() {
     println!("   每秒可处理评估次数: {:.0}", 1000.0 / avg_time.as_secs_f64());
 
     // 验证性能要求
-    assert!(avg_time < TokioDuration::from_millis(1), "平均评估时间应小于1毫秒");
+    assert!(avg_time < Duration::from_millis(1), "平均评估时间应小于1毫秒");
 
     // 验证统计信息
     let stats = engine.get_stats().await;
@@ -390,7 +387,7 @@ async fn test_policy_set_management() {
     engine.set_policy_set_enabled("complex-access-control", false).await.unwrap();
 
     let disabled_context = create_test_context()
-        .with_field("role".to_string(), serde_json::Value::String("admin".to_string()));
+        .set_field("role".to_string(), serde_json::Value::String("admin".to_string()));
 
     let result = engine.evaluate("complex-access-control", &disabled_context).await.unwrap();
     assert_eq!(result.final_action, PolicyAction::Deny); // 应该使用默认动作，因为策略集合被禁用
@@ -416,7 +413,7 @@ async fn test_complex_condition_evaluation() {
 
     // 测试正则表达式条件
     let email_context = PolicyContext::new()
-        .with_field("email".to_string(), serde_json::Value::String("user@example.com".to_string()));
+        .set_field("email".to_string(), serde_json::Value::String("user@example.com".to_string()));
 
     let regex_condition = PolicyCondition::new(
         "email".to_string(),
@@ -429,7 +426,7 @@ async fn test_complex_condition_evaluation() {
 
     // 测试数组包含条件
     let permissions_context = PolicyContext::new()
-        .with_field("permissions".to_string(), serde_json::Value::Array(vec![
+        .set_field("permissions".to_string(), serde_json::Value::Array(vec![
             serde_json::Value::String("read".to_string()),
             serde_json::Value::String("write".to_string()),
             serde_json::Value::String("admin".to_string()),
@@ -446,7 +443,7 @@ async fn test_complex_condition_evaluation() {
 
     // 测试数值比较条件
     let score_context = PolicyContext::new()
-        .with_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(85)));
+        .set_field("score".to_string(), serde_json::Value::Number(serde_json::Number::from(85)));
 
     let greater_condition = PolicyCondition::new(
         "score".to_string(),
@@ -459,7 +456,7 @@ async fn test_complex_condition_evaluation() {
 
     // 测试字符串包含条件
     let ip_context = PolicyContext::new()
-        .with_field("ip_address".to_string(), serde_json::Value::String("192.168.1.100".to_string()));
+        .set_field("ip_address".to_string(), serde_json::Value::String("192.168.1.100".to_string()));
 
     let contains_condition = PolicyCondition::new(
         "ip_address".to_string(),
@@ -491,11 +488,11 @@ async fn test_concurrent_policy_evaluation() {
     let mut handles = Vec::new();
 
     for i in 0..concurrent_count {
-        let engine_clone = std::sync::Arc::clone(&engine);
+        let engine_clone: std::sync::Arc<CompletePolicyEngine> = std::sync::Arc::clone(&engine);
         let handle = tokio::spawn(async move {
             let context = create_test_context()
-                .with_field("user_id".to_string(), serde_json::Value::String(format!("user-{}", i)))
-                .with_field("role".to_string(),
+                .set_field("user_id".to_string(), serde_json::Value::String(format!("user-{}", i)))
+                .set_field("role".to_string(),
                     if i % 3 == 0 {
                         serde_json::Value::String("admin".to_string())
                     } else if i % 3 == 1 {
@@ -570,12 +567,13 @@ async fn test_statistics_tracking() {
     let context = create_test_context();
 
     for i in 0..10 {
-        let mut test_context = context.clone();
-        if i % 2 == 0 {
-            test_context.set_field("role".to_string(), serde_json::Value::String("admin".to_string()));
-        } else {
-            test_context.set_field("role".to_string(), serde_json::Value::String("user".to_string()));
-        }
+        let test_context = context.clone().set_field("role".to_string(), 
+            if i % 2 == 0 {
+                serde_json::Value::String("admin".to_string())
+            } else {
+                serde_json::Value::String("user".to_string())
+            }
+        );
 
         let _ = engine.evaluate("complex-access-control", &test_context).await.unwrap();
     }
@@ -609,7 +607,7 @@ async fn test_error_handling() {
 
     assert!(result.is_err());
     let error = result.unwrap_err();
-    assert!(error.message.contains("策略集合不存在"));
+    assert!(error.to_string().contains("策略集合不存在"));
 
     // 测试移除不存在的策略集合
     let remove_result = engine.remove_policy_set("non-existent-policy").await;
