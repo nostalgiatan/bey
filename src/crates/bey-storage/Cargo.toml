@@ -9,7 +9,8 @@ error = { path = "../error" }
 sys = { path = "../sys" }
 bey-net = { path = "../bey-net" }
 bey-transport = { path = "../bey-transport" }
-bey-file-transfer = { path = "../bey-file-transfer" }
+# bey-file-transfer 已被移除，文件传输功能请使用 bey-net 模块
+# bey-file-transfer = { path = "../bey-file-transfer" }
 bey-identity = { path = "../bey-identity" }
 
 # 核心依赖

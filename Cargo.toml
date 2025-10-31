@@ -11,7 +11,9 @@ bey-identity = { path = "src/crates/bey-identity" }
 bey-storage = { path = "src/crates/bey-storage" }
 bey-transport = { path = "src/crates/bey-transport" }
 bey-net = { path = "src/crates/bey-net" }
-bey-file-transfer = { path = "src/crates/bey-file-transfer" }
+# bey-file-transfer 模块已被移除，其功能已被 bey-net 模块覆盖
+# 如需文件传输功能，请使用 bey-net 模块的 send_large_file() 等API
+# bey-file-transfer = { path = "src/crates/bey-file-transfer" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 tokio = { version = "1.48.0", features = ["rt", "net", "macros", "time", "sync"] }
@@ -27,7 +29,7 @@ time = "0.3.44"
 pem = "3.0.6"
 futures = "0.3"
 
-# 文件传输模块依赖
+# 以下依赖原本用于文件传输模块，现在可以考虑移除或保留给其他模块使用
 uuid = { version = "1.11", features = ["v4"] }
 fastrand = "2.0"
 keyring = "3.6"

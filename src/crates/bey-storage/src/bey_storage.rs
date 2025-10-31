@@ -1,7 +1,7 @@
 //! # BEY分布式存储系统
 //!
 //! 基于现有BEY网络基础设施的分布式对象存储系统，整合设备发现、
-//! 安全传输、文件传输等现有模块，提供统一的存储抽象层。
+//! 安全传输等现有模块，提供统一的存储抽象层。
 //!
 //! ## 架构设计
 //!
@@ -17,11 +17,18 @@
 //! │ 整合现有BEY模块:                                                   │
 //! │  ├─ bey_discovery (设备发现)                                     │
 //! │  ├─ bey_transport (安全传输)                                     │
-//! │  ├─ bey_file_transfer (文件传输)                                 │
+//! │  ├─ bey_net (网络传输，包含大文件传输功能)                         │
 //! │  ├─ bey_identity (身份验证)                                      │
 //! │  └─ bey_permissions (权限管理)                                    │
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
+//!
+//! ## 文件传输说明
+//!
+//! 文件传输功能已整合到 bey-net 模块中，使用以下API：
+//! - `TransportEngine::send_large_file()` - 发送大文件
+//! - `TransportEngine::receive_large_file()` - 接收大文件
+//! - `TransportEngine::send_to()` - 发送数据到指定设备
 
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use serde::{Deserialize, Serialize};
@@ -34,7 +41,8 @@ use tracing::{info, warn, debug};
 
 // 导入BEY现有模块
 use bey_net::{DiscoveryService, DiscoveryConfig, DeviceEvent, DeviceInfo};
-use bey_file_transfer::{TransferManager, TransferConfig};
+// bey_file_transfer 已被移除，文件传输功能请使用 bey_net 模块
+// use bey_file_transfer::{TransferManager, TransferConfig};
 use bey_identity::{CertificateManager, CertificateConfig};
 
 // 导入现有压缩功能
@@ -173,8 +181,9 @@ pub struct StorageConfig {
     pub cleanup_interval: Duration,
     /// 设备发现配置
     pub discovery_config: DiscoveryConfig,
-    /// 传输配置
-    pub transfer_config: TransferConfig,
+    // TODO: 使用 bey-net 模块配置替代
+    // 原 transfer_config 字段已移除，文件传输现在通过 bey-net 模块处理
+    // pub transfer_config: TransferConfig,
 }
 
 impl Default for StorageConfig {
@@ -188,7 +197,7 @@ impl Default for StorageConfig {
             cache_size_limit: 1024 * 1024 * 1024, // 1GB
             cleanup_interval: Duration::from_secs(3600), // 1小时
             discovery_config: DiscoveryConfig::default(),
-            transfer_config: TransferConfig::default(),
+            // transfer_config: TransferConfig::default(),
         }
     }
 }
@@ -201,8 +210,9 @@ pub struct BeyStorageManager {
     local_device: DeviceInfo,
     /// 设备发现服务
     discovery_service: Arc<RwLock<DiscoveryService>>,
-    /// 文件传输管理器
-    transfer_manager: Arc<TransferManager>,
+    // TODO: 使用 bey-net::TransportEngine 替代
+    // 原 transfer_manager 字段已移除，文件传输现在通过 bey-net 模块处理
+    // transfer_manager: Arc<TransferManager>,
     /// 证书管理器
     certificate_manager: Arc<CertificateManager>,
     // TODO: 将权限管理器迁移到bey-core模块
@@ -238,11 +248,12 @@ impl BeyStorageManager {
             .map_err(|e| ErrorInfo::new(5002, format!("创建发现服务失败: {}", e))
                 .with_category(ErrorCategory::Network))?;
 
-        // 初始化文件传输管理器
-        let transfer_manager = TransferManager::new(config.transfer_config.clone())
-            .await
-            .map_err(|e| ErrorInfo::new(5003, format!("创建传输管理器失败: {}", e))
-                .with_category(ErrorCategory::System))?;
+        // TODO: 文件传输现在通过 bey-net 模块处理
+        // 需要集成 bey-net::TransportEngine 来提供文件传输功能
+        // let transfer_manager = TransferManager::new(config.transfer_config.clone())
+        //     .await
+        //     .map_err(|e| ErrorInfo::new(5003, format!("创建传输管理器失败: {}", e))
+        //         .with_category(ErrorCategory::System))?;
 
         // 初始化证书管理器
         let certificate_manager = CertificateManager::initialize(CertificateConfig::default()).await
@@ -272,7 +283,7 @@ impl BeyStorageManager {
             config,
             local_device,
             discovery_service: Arc::new(RwLock::new(discovery_service)),
-            transfer_manager: Arc::new(transfer_manager),
+            // transfer_manager: Arc::new(transfer_manager),
             certificate_manager: Arc::new(certificate_manager),
             // TODO: 待权限管理器迁移到core后恢复
             // permission_manager: Arc::new(permission_manager),
