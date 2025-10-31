@@ -1,65 +1,95 @@
 //! # BEY 网络模块
 //!
-//! 提供BEY系统的网络通信基础功能，包括mDNS设备发现、
-//! 网络连接管理、数据传输等核心网络功能。
+//! 提供BEY系统的网络通信基础功能，基于有限状态机和令牌系统的高性能网络架构。
 //!
 //! ## 核心特性
 //!
-//! - **mDNS设备发现**: 零配置网络设备自动发现
-//! - **网络通信**: 高性能网络数据传输
-//! - **连接管理**: 智能连接池和连接复用
-//! - **安全传输**: 支持加密和认证的网络通信
-//! - **性能优化**: 零拷贝、内存池等性能优化技术
+//! - **令牌系统**: 灵活的基于令牌的消息传输
+//! - **状态机管理**: 清晰的连接状态管理
+//! - **元接收器**: 灵活的消息接收和过滤机制
+//! - **集成认证**: 无缝集成BEY身份认证
+//! - **加密传输**: 自动化的加密和解密
+//! - **高性能**: 零拷贝、内存池等优化技术
+//!
+//! ## 架构设计
+//!
+//! 本模块采用分层设计：
+//!
+//! 1. **令牌层**: 定义网络传输的基本单位（Token）
+//! 2. **状态机层**: 管理连接的生命周期和状态转换
+//! 3. **接收器层**: 提供灵活的消息接收和处理机制
+//! 4. **传输引擎层**: 集成所有组件的完整传输引擎
+//! 5. **设备发现层**: mDNS和UDP广播设备发现
 //!
 //! ## 使用示例
 //!
 //! ```rust,no_run
-//! use bey_net::{MdnsDiscovery, MdnsDiscoveryConfig, MdnsServiceInfo};
-//! use std::net::IpAddr;
+//! use bey_net::{TransportEngine, EngineConfig, Token, TokenMeta};
+//! use std::net::SocketAddr;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // 创建mDNS配置
-//! let config = MdnsDiscoveryConfig::default();
+//! // 创建传输引擎
+//! let config = EngineConfig::default();
+//! let engine = TransportEngine::new(config).await?;
 //!
-//! // 创建设备信息
-//! let device_info = MdnsServiceInfo {
-//!     service_name: "my-device".to_string(),
-//!     service_type: "_bey._tcp".to_string(),
-//!     domain: "local".to_string(),
-//!     hostname: "my-device.local".to_string(),
-//!     port: 8080,
-//!     priority: 0,
-//!     weight: 0,
-//!     addresses: vec![],
-//!     txt_records: vec![],
-//!     ttl: 120,
-//! };
+//! // 连接到服务器
+//! let server_addr: SocketAddr = "127.0.0.1:8080".parse()?;
+//! engine.connect(server_addr).await?;
 //!
-//! // 创建mDNS发现服务
-//! let discovery = MdnsDiscovery::new(config, device_info).await?;
+//! // 发送令牌
+//! let meta = TokenMeta::new("test".to_string(), "client".to_string());
+//! let token = Token::new(meta, vec![1, 2, 3]);
+//! engine.send_token(token).await?;
 //!
-//! // 启动服务
-//! discovery.start().await?;
-//!
-//! // 查询服务
-//! let services = discovery.query_service("_bey._tcp", None).await?;
-//! println!("发现 {} 个服务", services.len());
-//!
-//! // 停止服务
-//! discovery.stop().await?;
+//! // 接收令牌
+//! use bey_net::ReceiverMode;
+//! if let Some(token) = engine.receive_token(ReceiverMode::NonBlocking).await? {
+//!     println!("收到令牌: {}", token.meta.id);
+//! }
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! ## 模块结构
 //!
-//! - `mdns_discovery` - mDNS设备发现功能
-//! - 未来将添加更多网络功能模块
+//! - `token` - 令牌系统：定义Token、TokenMeta、TokenHandler、TokenRouter
+//! - `state_machine` - 状态机：管理连接状态和转换
+//! - `receiver` - 元接收器：灵活的消息接收机制
+//! - `engine` - 传输引擎：集成所有功能的核心引擎
+//! - `mdns_discovery` - mDNS设备发现
+//! - `udp_discovery` - UDP广播设备发现
 
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 
 /// 网络模块结果类型
 pub type NetResult<T> = std::result::Result<T, ErrorInfo>;
+
+// 导出令牌系统
+pub mod token;
+pub use token::{
+    Token, TokenMeta, TokenId, TokenType, TokenPriority,
+    TokenHandler, TokenRouter,
+};
+
+// 导出状态机
+pub mod state_machine;
+pub use state_machine::{
+    ConnectionState, ConnectionStateMachine, StateEvent, StateTransition,
+};
+
+// 导出元接收器
+pub mod receiver;
+pub use receiver::{
+    MetaReceiver, BufferedReceiver, ReceiverMode,
+    ReceiverFilter, TypeFilter, PriorityFilter,
+    create_receiver,
+};
+
+// 导出传输引擎
+pub mod engine;
+pub use engine::{
+    TransportEngine, EngineConfig,
+};
 
 // 导出mDNS发现模块
 mod mdns_discovery;

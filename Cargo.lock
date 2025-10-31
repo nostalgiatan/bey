@@ -484,6 +484,9 @@ dependencies = [
 name = "bey-net"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "bey-identity",
+ "bey-transport",
  "bey-types",
  "error",
  "mdns",
@@ -492,6 +495,7 @@ dependencies = [
  "sys",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

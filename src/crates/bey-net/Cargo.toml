@@ -10,6 +10,8 @@ description = "BEY网络模块 - 提供mDNS发现、网络通信等基础网络�
 error = { path = "../error" }
 sys = { path = "../sys" }
 bey-types = { path = "../bey-types" }
+bey-transport = { path = "../bey-transport" }
+bey-identity = { path = "../bey-identity" }
 
 # 异步运行时
 tokio = { version = "1.48.0", features = ["net", "time", "sync", "macros"] }
@@ -20,6 +22,12 @@ serde_json = "1.0.145"
 
 # 网络发现
 mdns = "3.0"
+
+# 异步特征
+async-trait = "0.1"
+
+# UUID生成
+uuid = { version = "1.18.1", features = ["v4"] }
 
 # 日志
 tracing = "0.1"
