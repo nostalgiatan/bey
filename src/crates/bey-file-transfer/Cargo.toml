@@ -1,0 +1,76 @@
+[package]
+name = "bey-file-transfer"
+version = "0.1.0"
+edition = "2021"
+authors = ["BEY Team"]
+description = "高性能文件传输模块 - 支持断点续传、多线程并发传输、完整性校验"
+
+[dependencies]
+# 核心依赖
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 错误处理
+error = { path = "../error" }
+
+# 权限控制
+bey-permissions = { path = "../bey-permissions" }
+
+# 加密和哈希
+sha2 = "0.10"
+blake3 = "1.5"
+chacha20poly1305 = "0.10"
+aead = "0.5"
+generic-array = "1.1"
+rand = "0.8"
+argon2 = "0.5"
+
+# 异步支持
+async-trait = "0.1"
+
+# 唯一标识符
+uuid = { version = "1.11", features = ["v4"] }
+
+# 随机数生成
+fastrand = "2.0"
+
+# Base64编码
+base64 = "0.22.1"
+
+# 异步支持
+futures = "0.3"
+
+# 网络和传输
+bytes = "1.5"
+tokio-util = "0.7"
+
+# BEY网络基础设施
+bey-transport = { path = "../bey-transport" }
+bey-discovery = { path = "../bey-discovery" }
+
+# QUIC协议
+quinn = "0.11"
+
+# 文件系统
+walkdir = "2.4"
+
+# 日志和追踪
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# 性能优化
+parking_lot = "0.12"
+dashmap = "5.5"
+crossbeam = "0.8"
+
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3.8"
+criterion = "0.5"
+
+# [[bench]]
+# name = "transfer_benchmarks"
+# harness = false

@@ -1,0 +1,26 @@
+[package]
+name = "bey-transport"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bey-types = { path = "../bey-types" }
+error = { path = "../error" }
+sys = { path = "../sys" }
+bey-identity = { path = "../bey-identity" }
+tokio = { version = "1.48.0", features = ["net", "time", "sync", "macros"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+quinn = { version = "0.11.9", features = ["runtime-tokio", "rustls-ring"] }
+rustls = "0.23.34"
+rustls-pemfile = "2.2"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+bytes = "1.10.1"
+x509-parser = "0.16"
+hex = "0.4"
+base64 = "0.22.1"
+sha2 = "0.10.9"
+fastrand = "2.3.0"
+regex = "1.11.1"
+tempfile = "3.13.0"

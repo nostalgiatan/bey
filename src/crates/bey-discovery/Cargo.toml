@@ -1,0 +1,14 @@
+[package]
+name = "bey-discovery"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bey-types = { path = "../bey-types" }
+error = { path = "../error" }
+sys = { path = "../sys" }
+tokio = { version = "1.48.0", features = ["net", "time", "sync"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+mdns = "3.0"
+tracing = "0.1"
