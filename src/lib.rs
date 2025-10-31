@@ -11,23 +11,55 @@
 //! - **资源贡献**: 利用闲置磁盘空间创建分布式存储
 //! - **权限管理**: 基于证书的细粒度权限控制
 //! - **极致性能**: 零隐式转换，内存安全优化
+//! - **插件系统**: 灵活的插件架构，支持功能扩展
 //!
 //! ## 模块架构
 //!
 //! ```
 //! bey/
-//! ├── crates/
-//! │   ├── error/          # 错误处理框架
-//! │   ├── sys/            # 系统监控模块
-//! │   ├── bey-core/       # 核心库
-//! │   ├── bey-discovery/  # 设备发现
-//! │   ├── bey-transport/  # 安全传输
-//! │   ├── bey-storage/    # 分布式存储
-//! │   ├── bey-clipboard/  # 剪切板同步
-//! │   ├── bey-messaging/  # 消息传递
-//! │   └── bey-permissions/# 权限管理
-//! └── app-tauri/         # Tauri 前端应用
+//! ├── src/
+//! │   ├── main.rs         # 主程序入口
+//! │   ├── lib.rs          # 库入口
+//! │   ├── app.rs          # 应用程序管理器
+//! │   └── crates/
+//! │       ├── error/          # 错误处理框架
+//! │       ├── sys/            # 系统监控模块
+//! │       ├── bey-types/      # 类型定义
+//! │       ├── bey-identity/   # 身份和证书管理
+//! │       ├── bey-transport/  # QUIC传输层
+//! │       ├── bey-net/        # 网络传输和Token路由
+//! │       ├── bey-storage/    # 分布式存储（对象、云、剪切板、消息）
+//! │       ├── bey-func/       # 分布式功能高级API
+//! │       ├── bey-plugin/     # 插件系统
+//! │       ├── bey-gui/        # GUI界面（Tauri）
+//! │       └── bey-tui/        # TUI界面（ratatui）
 //! ```
+//!
+//! ## 使用示例
+//!
+//! ```no_run
+//! use bey::app::{AppConfig, BeyAppManager};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // 创建应用程序管理器
+//!     let config = AppConfig::default();
+//!     let mut manager = BeyAppManager::new(config).await?;
+//!
+//!     // 初始化并启动
+//!     manager.initialize().await?;
+//!     manager.start().await?;
+//!
+//!     // 应用程序运行...
+//!
+//!     // 停止应用程序
+//!     manager.stop().await?;
+//!     Ok(())
+//! }
+//! ```
+
+// 导出应用程序模块
+pub mod app;
 
 use error::{ErrorInfo, ErrorCategory};
 use sys::SystemInfo;
