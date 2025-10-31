@@ -484,7 +484,9 @@ dependencies = [
 name = "bey-net"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "async-trait",
+ "base64",
  "bey-identity",
  "bey-transport",
  "bey-types",
@@ -492,6 +494,7 @@ dependencies = [
  "mdns",
  "serde",
  "serde_json",
+ "sha2",
  "sys",
  "tokio",
  "tracing",

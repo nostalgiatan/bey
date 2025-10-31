@@ -29,6 +29,11 @@ async-trait = "0.1"
 # UUID生成
 uuid = { version = "1.18.1", features = ["v4"] }
 
+# 加密库
+sha2 = "0.10"
+aes-gcm = "0.10"
+base64 = "0.22"
+
 # 日志
 tracing = "0.1"
 

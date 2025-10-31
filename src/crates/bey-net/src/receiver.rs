@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::{NetResult, token::{Token, TokenType, TokenPriority}};
 
