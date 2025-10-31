@@ -1,0 +1,25 @@
+[package]
+name = "bey-plugin"
+version = "0.1.0"
+edition = "2021"
+authors = ["BEY Team"]
+description = "BEY 插件系统 - 为 BEY 项目提供完整的插件架构和生命周期管理"
+
+[dependencies]
+# BEY 模块
+error = { path = "../error" }
+
+# 核心依赖
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+
+# 异步支持
+async-trait = "0.1"
+
+# 并发
+dashmap = "6.0"
+
+[dev-dependencies]
+tempfile = "3.0"

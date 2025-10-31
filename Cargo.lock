@@ -380,6 +380,7 @@ dependencies = [
  "bey-func",
  "bey-identity",
  "bey-net",
+ "bey-plugin",
  "bey-storage",
  "bey-transport",
  "bey-types",
@@ -461,6 +462,19 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "bey-plugin"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "dashmap",
+ "error",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
