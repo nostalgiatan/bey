@@ -11,8 +11,6 @@
 //! - **加密传输**: 自动加密和解密令牌
 //! - **灵活接入**: 通过继承元类即可接入网络功能
 
-#![allow(deprecated)]  // Temporary: generic-array 0.x deprecation, will be fixed with upgrade
-
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use std::net::{SocketAddr, IpAddr};
 use std::sync::Arc;
@@ -24,8 +22,9 @@ use bey_transport::{SecureTransport, TransportConfig};
 use bey_identity::{CertificateManager, CertificateData};
 use sha2::{Sha256, Digest};
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng, generic_array::GenericArray},
-    Aes256Gcm,
+    aead::{Aead, KeyInit, OsRng},
+    Aes256Gcm, Nonce,
+    aead::consts::U12,
 };
 use base64::{Engine as _, engine::general_purpose};
 
@@ -853,7 +852,7 @@ impl TransportEngine {
         let mut nonce_bytes = [0u8; 12];
         use aes_gcm::aead::rand_core::RngCore;
         OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = GenericArray::from_slice(&nonce_bytes);
+        let nonce: &Nonce<U12> = &nonce_bytes.into();
 
         // 加密负载
         let ciphertext = cipher.encrypt(nonce, token.payload.as_ref()).map_err(|e| {
@@ -920,7 +919,11 @@ impl TransportEngine {
                 .with_severity(ErrorSeverity::Error));
         }
 
-        let nonce = GenericArray::from_slice(&token.payload[0..12]);
+        let nonce: &Nonce<U12> = (&token.payload[0..12]).try_into().map_err(|_| {
+            ErrorInfo::new(4316, "Nonce转换失败".to_string())
+                .with_category(ErrorCategory::Parse)
+                .with_severity(ErrorSeverity::Error)
+        })?;
         let ciphertext = &token.payload[12..];
 
         // 解密负载
