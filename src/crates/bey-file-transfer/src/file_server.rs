@@ -26,7 +26,7 @@ use bytes::Bytes;
 
 // BEY 网络组件
 use bey_transport::{SecureTransport, TransportConfig};
-use bey_discovery::{DiscoveryService, DiscoveryConfig, DeviceInfo};
+use bey_net::{DiscoveryService, DiscoveryConfig, DeviceInfo};
 
 // 本地模块
 use crate::{TransferResult, StorageInterface};

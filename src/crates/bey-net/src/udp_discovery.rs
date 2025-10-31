@@ -41,11 +41,6 @@ pub struct DeviceInfo {
     pub last_active: SystemTime,
 }
 
-mod mdns_discovery;
-pub use mdns_discovery::{
-    MdnsDiscovery, MdnsDiscoveryConfig, MdnsServiceInfo, MdnsDiscoveryEvent,
-    MdnsInfo, MdnsQuery, MdnsRecord, MdnsResponse
-};
 
 /// 设备发现服务结果类型
 pub type DiscoveryResult<T> = std::result::Result<T, ErrorInfo>;

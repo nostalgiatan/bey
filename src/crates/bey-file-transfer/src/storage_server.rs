@@ -23,7 +23,7 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tracing::{info, error, debug};
 use bey_transport::{SecureTransport, TransportConfig, TransportMessage};
 use quinn;
-use bey_discovery::{MdnsDiscovery, MdnsDiscoveryConfig, MdnsServiceInfo};
+use bey_net::{MdnsDiscovery, MdnsDiscoveryConfig, MdnsServiceInfo};
 use uuid::Uuid;
 use std::sync::atomic::{AtomicU64, Ordering};
 use crate::TransferResult;

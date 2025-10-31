@@ -395,10 +395,9 @@ dependencies = [
  "aes-gcm",
  "async-trait",
  "base64",
- "bey-discovery",
  "bey-file-transfer",
  "bey-identity",
- "bey-permissions",
+ "bey-net",
  "bey-storage",
  "bey-transport",
  "bey-types",
@@ -428,20 +427,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bey-discovery"
-version = "0.1.0"
-dependencies = [
- "bey-types",
- "error",
- "mdns",
- "serde",
- "serde_json",
- "sys",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "bey-file-transfer"
 version = "0.1.0"
 dependencies = [
@@ -449,8 +434,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "base64",
- "bey-discovery",
- "bey-permissions",
+ "bey-net",
  "bey-transport",
  "blake3",
  "bytes",
@@ -497,16 +481,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "bey-permissions"
+name = "bey-net"
 version = "0.1.0"
 dependencies = [
+ "bey-types",
  "error",
+ "mdns",
  "serde",
  "serde_json",
  "sys",
  "tokio",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -517,10 +502,9 @@ dependencies = [
  "async-compression",
  "async-trait",
  "base64",
- "bey-discovery",
  "bey-file-transfer",
  "bey-identity",
- "bey-permissions",
+ "bey-net",
  "bey-transport",
  "bytes",
  "dashmap 6.1.0",
