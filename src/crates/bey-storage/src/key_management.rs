@@ -35,6 +35,7 @@ pub enum KeyType {
 
 /// 密钥元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct KeyMetadata {
     /// 密钥类型
     pub key_type: KeyType,
@@ -54,6 +55,7 @@ pub struct KeyMetadata {
     pub attributes: HashMap<String, String>,
 }
 
+#[allow(dead_code)]
 impl KeyMetadata {
     /// 创建新的密钥元数据
     pub fn new(key_type: KeyType, description: String) -> Self {
@@ -92,6 +94,7 @@ impl KeyMetadata {
 
 /// 密钥条目
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct KeyEntry {
     /// 密钥ID
     key_id: String,
@@ -101,6 +104,7 @@ struct KeyEntry {
     metadata: KeyMetadata,
 }
 
+#[allow(dead_code)]
 impl KeyEntry {
     /// 创建新的密钥条目
     fn new(key_id: String, key_data: Vec<u8>, key_type: KeyType) -> Self {
@@ -136,6 +140,7 @@ impl KeyEntry {
 
 /// 跨平台密钥存储后端
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum KeyStorageBackend {
     /// 系统密钥环（推荐）
     SystemKeyring,
@@ -146,6 +151,7 @@ pub enum KeyStorageBackend {
 }
 
 /// 安全密钥管理器
+#[allow(dead_code)]
 pub struct SecureKeyManager {
     /// 服务名称前缀
     service_prefix: String,
@@ -277,6 +283,7 @@ impl SecureKeyManager {
     }
 
     /// 获取操作系统信息
+    #[allow(dead_code)]
     fn get_os_info() -> &'static str {
         #[cfg(target_os = "windows")]
         return "Windows";

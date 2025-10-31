@@ -70,7 +70,6 @@
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use std::path::PathBuf;
 use std::sync::Arc;
-use async_trait::async_trait;
 
 // 导出子模块
 pub mod message_func;
@@ -93,8 +92,6 @@ pub struct BeyFuncManager {
     device_id: String,
     /// 网络引擎
     engine: Arc<bey_net::TransportEngine>,
-    /// 存储管理器
-    storage: Arc<bey_storage::UnifiedStorageManager>,
     /// 消息功能
     pub message: MessageFunc,
     /// 剪切板功能
@@ -159,7 +156,6 @@ impl BeyFuncManager {
         Ok(Self {
             device_id: device_id.to_string(),
             engine,
-            storage,
             message,
             clipboard,
             storage_func,

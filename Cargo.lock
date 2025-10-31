@@ -377,6 +377,7 @@ dependencies = [
  "aes-gcm",
  "async-trait",
  "base64",
+ "bey-func",
  "bey-identity",
  "bey-net",
  "bey-storage",
@@ -405,6 +406,20 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "bey-func"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bey-net",
+ "bey-storage",
+ "error",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

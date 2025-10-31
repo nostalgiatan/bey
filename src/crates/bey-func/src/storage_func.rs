@@ -42,7 +42,6 @@ impl StorageFunc {
     /// 注册存储处理器
     pub async fn register_handlers(&self, engine: &TransportEngine) -> FuncResult<()> {
         let handler = StorageHandler {
-            device_id: self.device_id.clone(),
             storage: Arc::clone(&self.storage),
         };
 
@@ -178,7 +177,6 @@ impl StorageFunc {
 
 /// 存储处理器
 struct StorageHandler {
-    device_id: String,
     storage: Arc<UnifiedStorageManager>,
 }
 

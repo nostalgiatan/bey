@@ -6,12 +6,11 @@
 
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use sled::Db;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{info, debug, warn};
+use tracing::{info, debug};
 use sha2::{Sha256, Digest};
 
 /// 云存储结果类型
@@ -164,6 +163,7 @@ impl ChunkPrefix {
     }
 
     /// 获取文件名
+    #[allow(dead_code)]
     fn get_filename(&self) -> String {
         // 找到第一个零字节
         let end = self.filename.iter().position(|&b| b == 0).unwrap_or(64);

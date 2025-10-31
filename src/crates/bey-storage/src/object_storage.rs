@@ -4,11 +4,10 @@
 //! 用于直接的文件传输场景。
 
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::PathBuf;
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{info, debug, warn};
+use tracing::{info, debug};
 
 /// 对象存储结果类型
 pub type ObjectStorageResult<T> = std::result::Result<T, ErrorInfo>;

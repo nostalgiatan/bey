@@ -42,7 +42,6 @@ impl ClipboardFunc {
     /// 注册剪切板处理器
     pub async fn register_handlers(&self, engine: &TransportEngine) -> FuncResult<()> {
         let handler = ClipboardHandler {
-            device_id: self.device_id.clone(),
             storage: Arc::clone(&self.storage),
         };
 
@@ -198,7 +197,6 @@ impl ClipboardFunc {
 
 /// 剪切板处理器
 struct ClipboardHandler {
-    device_id: String,
     storage: Arc<UnifiedStorageManager>,
 }
 

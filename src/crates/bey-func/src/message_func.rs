@@ -6,14 +6,13 @@
 use error::{ErrorInfo, ErrorCategory, ErrorSeverity};
 use std::sync::Arc;
 use bey_net::{TransportEngine, Token, TokenMeta, TokenHandler, NetResult};
-use bey_storage::{UnifiedStorageManager, MessageType, Message};
+use bey_storage::{UnifiedStorageManager, MessageType};
 use async_trait::async_trait;
 use tracing::{info, debug};
 
 use crate::FuncResult;
 
 /// 消息令牌类型
-const MESSAGE_TOKEN_TYPE: &str = "bey.message";
 const MESSAGE_PRIVATE_TOKEN: &str = "bey.message.private";
 const MESSAGE_GROUP_TOKEN: &str = "bey.message.group";
 const MESSAGE_BROADCAST_TOKEN: &str = "bey.message.broadcast";
