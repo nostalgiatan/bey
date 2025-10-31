@@ -734,12 +734,16 @@ pub struct StorageStatistics {
 /// 便捷函数：创建默认的BEY存储管理器
 pub async fn create_default_bey_storage() -> StorageResult<BeyStorageManager> {
     let config = StorageConfig::default();
-    let device_info = DeviceInfo::new(
-        "default_device".to_string(),
-        "Default BEY Device".to_string(),
-        bey_types::DeviceType::Desktop,
-        "127.0.0.1:8080".parse().unwrap(),
-    );
+    let device_info = DeviceInfo {
+        device_id: "default_device".to_string(),
+        device_name: "Default BEY Device".to_string(),
+        device_type: "Desktop".to_string(),
+        address: "127.0.0.1:8080".parse()
+            .map_err(|e| ErrorInfo::new(5090, format!("解析地址失败: {}", e))
+                .with_category(ErrorCategory::Network))?,
+        capabilities: vec!["storage".to_string()],
+        last_active: SystemTime::now(),
+    };
 
     BeyStorageManager::new(config, device_info).await
 }
