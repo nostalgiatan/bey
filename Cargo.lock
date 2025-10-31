@@ -395,10 +395,9 @@ dependencies = [
  "aes-gcm",
  "async-trait",
  "base64",
- "bey-discovery",
  "bey-file-transfer",
  "bey-identity",
- "bey-permissions",
+ "bey-net",
  "bey-storage",
  "bey-transport",
  "bey-types",
@@ -428,20 +427,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bey-discovery"
-version = "0.1.0"
-dependencies = [
- "bey-types",
- "error",
- "mdns",
- "serde",
- "serde_json",
- "sys",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "bey-file-transfer"
 version = "0.1.0"
 dependencies = [
@@ -449,8 +434,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "base64",
- "bey-discovery",
- "bey-permissions",
+ "bey-net",
  "bey-transport",
  "blake3",
  "bytes",
@@ -497,12 +481,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "bey-permissions"
+name = "bey-net"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
+ "async-trait",
+ "base64",
+ "bey-identity",
+ "bey-transport",
+ "bey-types",
  "error",
+ "mdns",
  "serde",
  "serde_json",
+ "sha2",
  "sys",
  "tokio",
  "tracing",
@@ -517,10 +509,9 @@ dependencies = [
  "async-compression",
  "async-trait",
  "base64",
- "bey-discovery",
  "bey-file-transfer",
  "bey-identity",
- "bey-permissions",
+ "bey-net",
  "bey-transport",
  "bytes",
  "dashmap 6.1.0",
@@ -1056,27 +1047,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
-name = "dbus"
-version = "0.9.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "190b6255e8ab55a7b568df5a883e9497edc3e4821c06396612048b430e5ad1e9"
-dependencies = [
- "libc",
- "libdbus-sys",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "dbus-secret-service"
-version = "4.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "708b509edf7889e53d7efb0ffadd994cc6c2345ccb62f55cfd6b0682165e4fa6"
-dependencies = [
- "dbus",
- "zeroize",
-]
-
-[[package]]
 name = "der-parser"
 version = "9.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1606,7 +1576,6 @@ version = "3.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
 dependencies = [
- "dbus-secret-service",
  "log",
  "zeroize",
 ]
@@ -1631,15 +1600,6 @@ name = "libc"
 version = "0.2.177"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
-
-[[package]]
-name = "libdbus-sys"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cbe856efeb50e4681f010e9aaa2bf0a644e10139e54cde10fc83a307c23bd9f"
-dependencies = [
- "pkg-config",
-]
 
 [[package]]
 name = "libloading"
@@ -3297,15 +3257,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
-dependencies = [
- "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb"
@@ -3631,20 +3582,6 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
-dependencies = [
- "zeroize_derive",
-]
-
-[[package]]
-name = "zeroize_derive"
-version = "1.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.108",
-]
 
 [[package]]
 name = "zstd"

@@ -6,7 +6,7 @@
 use error::{ErrorInfo, ErrorCategory};
 use std::path::Path;
 use std::sync::Arc;
-use bey_discovery::DeviceInfo;
+use bey_net::DeviceInfo;
 
 // 导入模块
 pub mod compression;

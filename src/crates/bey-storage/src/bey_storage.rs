@@ -33,10 +33,9 @@ use tokio::sync::RwLock;
 use tracing::{info, warn, debug};
 
 // 导入BEY现有模块
-use bey_discovery::{DiscoveryService, DiscoveryConfig, DeviceEvent, DeviceInfo};
+use bey_net::{DiscoveryService, DiscoveryConfig, DeviceEvent, DeviceInfo};
 use bey_file_transfer::{TransferManager, TransferConfig};
 use bey_identity::{CertificateManager, CertificateConfig};
-use bey_permissions::PermissionManager;
 
 // 导入现有压缩功能
 use crate::compression::{SmartCompressor, CompressionStrategy};
@@ -206,8 +205,8 @@ pub struct BeyStorageManager {
     transfer_manager: Arc<TransferManager>,
     /// 证书管理器
     certificate_manager: Arc<CertificateManager>,
-    /// 权限管理器
-    permission_manager: Arc<PermissionManager>,
+    // TODO: 将权限管理器迁移到bey-core模块
+    // permission_manager: Arc<PermissionManager>,
     /// 密钥管理器
     key_manager: Arc<SecureKeyManager>,
     /// 智能压缩器
@@ -250,10 +249,10 @@ impl BeyStorageManager {
             .map_err(|e| ErrorInfo::new(5004, format!("创建证书管理器失败: {}", e))
                 .with_category(ErrorCategory::Authentication))?;
 
-        // 初始化权限管理器
-        let permission_manager = PermissionManager::new().await
-            .map_err(|e| ErrorInfo::new(5005, format!("创建权限管理器失败: {}", e))
-                .with_category(ErrorCategory::Authorization))?;
+        // TODO: 初始化权限管理器（将迁移到bey-core）
+        // let permission_manager = PermissionManager::new().await
+        //     .map_err(|e| ErrorInfo::new(5005, format!("创建权限管理器失败: {}", e))
+        //         .with_category(ErrorCategory::Authorization))?;
 
         // 初始化密钥管理器
         let key_manager = SecureKeyManager::new("bey_storage", true)
@@ -275,7 +274,8 @@ impl BeyStorageManager {
             discovery_service: Arc::new(RwLock::new(discovery_service)),
             transfer_manager: Arc::new(transfer_manager),
             certificate_manager: Arc::new(certificate_manager),
-            permission_manager: Arc::new(permission_manager),
+            // TODO: 待权限管理器迁移到core后恢复
+            // permission_manager: Arc::new(permission_manager),
             key_manager: Arc::new(key_manager),
             compressor,
             storage_nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -734,12 +734,16 @@ pub struct StorageStatistics {
 /// 便捷函数：创建默认的BEY存储管理器
 pub async fn create_default_bey_storage() -> StorageResult<BeyStorageManager> {
     let config = StorageConfig::default();
-    let device_info = DeviceInfo::new(
-        "default_device".to_string(),
-        "Default BEY Device".to_string(),
-        bey_types::DeviceType::Desktop,
-        "127.0.0.1:8080".parse().unwrap(),
-    );
+    let device_info = DeviceInfo {
+        device_id: "default_device".to_string(),
+        device_name: "Default BEY Device".to_string(),
+        device_type: "Desktop".to_string(),
+        address: "127.0.0.1:8080".parse()
+            .map_err(|e| ErrorInfo::new(5090, format!("解析地址失败: {}", e))
+                .with_category(ErrorCategory::Network))?,
+        capabilities: vec!["storage".to_string()],
+        last_active: SystemTime::now(),
+    };
 
     BeyStorageManager::new(config, device_info).await
 }

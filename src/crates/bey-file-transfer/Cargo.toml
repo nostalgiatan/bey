@@ -14,9 +14,6 @@ serde_json = "1.0"
 # 错误处理
 error = { path = "../error" }
 
-# 权限控制
-bey-permissions = { path = "../bey-permissions" }
-
 # 加密和哈希
 sha2 = "0.10"
 blake3 = "1.5"
@@ -47,7 +44,7 @@ tokio-util = "0.7"
 
 # BEY网络基础设施
 bey-transport = { path = "../bey-transport" }
-bey-discovery = { path = "../bey-discovery" }
+bey-net = { path = "../bey-net" }
 
 # QUIC协议
 quinn = "0.11"
