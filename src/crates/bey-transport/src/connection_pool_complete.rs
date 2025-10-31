@@ -567,19 +567,23 @@ impl CompleteConnectionPool {
         if let Some(group) = groups.get_mut(&addr) {
             // 根据负载均衡策略选择连接
             if let Some(index) = self.select_connection_by_strategy(group).await {
-                let mut conn_info = group.connections.remove(index).unwrap();
+                // 安全地移除并处理连接
+                if index < group.connections.len() {
+                    let mut conn_info = group.connections.remove(index);
 
-                // 更新连接信息
-                conn_info.last_used = SystemTime::now();
-                conn_info.usage_count += 1;
-                conn_info.active = true;
-                conn_info.active_requests += 1;
+                    // 更新连接信息
+                    conn_info.last_used = SystemTime::now();
+                    conn_info.usage_count += 1;
+                    conn_info.active = true;
+                    conn_info.active_requests += 1;
 
-                // 重新插入到列表末尾（LRU）
-                group.connections.push_back(conn_info);
-                group.last_used = SystemTime::now();
+                    // 重新插入到列表末尾（LRU）
+                    let connection = conn_info.connection.clone();
+                    group.connections.push_back(conn_info);
+                    group.last_used = SystemTime::now();
 
-                return Some(group.connections.back().unwrap().connection.clone());
+                    return Some(connection);
+                }
             }
         }
 
@@ -882,10 +886,12 @@ impl CompleteConnectionPool {
 
         let mut groups = self.address_groups.write().await;
         if let Some(group) = groups.get_mut(&addr) {
-            while let Some(request) = group.pending_requests.front() {
+            while group.pending_requests.front().is_some() {
                 if let Some(connection) = self.try_get_existing_connection(addr).await {
-                    let request = group.pending_requests.pop_front().unwrap();
-                    let _ = request.response_sender.send(Ok(connection));
+                    // 安全地弹出请求
+                    if let Some(request) = group.pending_requests.pop_front() {
+                        let _ = request.response_sender.send(Ok(connection));
+                    }
                 } else {
                     break; // 没有可用连接，停止处理
                 }

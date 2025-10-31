@@ -459,7 +459,14 @@ impl CompleteMtlsManager {
             if i > 0 {
                 pem.push('\n');
             }
-            pem.push_str(std::str::from_utf8(chunk).unwrap());
+            // base64编码后的数据一定是有效的UTF-8，但为了安全使用match处理
+            match std::str::from_utf8(chunk) {
+                Ok(s) => pem.push_str(s),
+                Err(_) => {
+                    // 这种情况理论上不应该发生，但为了安全跳过这个chunk
+                    continue;
+                }
+            }
         }
 
         pem.push_str("\n-----END CERTIFICATE-----");
