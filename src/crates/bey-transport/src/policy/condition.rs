@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use super::types::ConditionOperator;
 use super::context::PolicyContext;
+use crate::error_codes::policy as policy_errors;
 
 /// 策略条件
 ///
@@ -134,7 +135,7 @@ impl PolicyCondition {
             // 正则表达式匹配
             (ConditionOperator::Regex, serde_json::Value::String(actual), serde_json::Value::String(pattern)) => {
                 let regex = regex::Regex::new(pattern)
-                    .map_err(|e| ErrorInfo::new(6001, format!("无效的正则表达式: {}", e))
+                    .map_err(|e| ErrorInfo::new(policy_errors::INVALID_REGEX, format!("无效的正则表达式: {}", e))
                         .with_category(ErrorCategory::Configuration)
                         .with_severity(ErrorSeverity::Error))?;
                 regex.is_match(actual)

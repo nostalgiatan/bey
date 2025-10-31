@@ -26,6 +26,9 @@ use bey_identity::{CertificateManager, CertificateData};
 // 使用mtls模块中的配置类型
 pub use crate::mtls::{MtlsConfig, MtlsStats};
 
+// 使用错误代码常量
+use crate::error_codes::mtls as mtls_errors;
+
 /// 完整的mTLS管理器
 pub struct CompleteMtlsManager {
     /// 配置信息
@@ -60,14 +63,14 @@ impl CompleteMtlsManager {
             .with_country_code(&config.country_code)
             .with_storage_directory(&config.certificates_dir)
             .build()
-            .map_err(|e| ErrorInfo::new(5001, format!("创建证书配置失败: {}", e))
+            .map_err(|e| ErrorInfo::new(mtls_errors::CREATE_CERT_CONFIG_FAILED, format!("创建证书配置失败: {}", e))
                 .with_category(ErrorCategory::Configuration)
                 .with_severity(ErrorSeverity::Error))?;
 
         let certificate_manager = Arc::new(
             CertificateManager::initialize(certificate_config)
                 .await
-                .map_err(|e| ErrorInfo::new(5002, format!("初始化证书管理器失败: {}", e))
+                .map_err(|e| ErrorInfo::new(mtls_errors::INIT_CERT_MANAGER_FAILED, format!("初始化证书管理器失败: {}", e))
                     .with_category(ErrorCategory::System)
                     .with_severity(ErrorSeverity::Error))?
         );
@@ -91,7 +94,7 @@ impl CompleteMtlsManager {
     /// 验证配置
     fn validate_config(config: &MtlsConfig) -> Result<(), ErrorInfo> {
         if config.config_cache_ttl.is_zero() {
-            return Err(ErrorInfo::new(5003, "配置缓存TTL必须大于0".to_string())
+            return Err(ErrorInfo::new(mtls_errors::INVALID_CACHE_TTL, "配置缓存TTL必须大于0".to_string())
                 .with_category(ErrorCategory::Configuration)
                 .with_severity(ErrorSeverity::Error));
         }

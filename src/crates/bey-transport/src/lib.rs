@@ -16,6 +16,7 @@
 pub mod pool;
 pub mod policy;
 pub mod mtls;
+pub mod error_codes;
 
 // 兼容性模块声明 - 保留旧的模块以便逐步迁移
 pub mod mtls_manager;
