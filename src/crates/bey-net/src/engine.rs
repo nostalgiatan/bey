@@ -273,6 +273,7 @@ impl TransportEngine {
         let metrics = Arc::clone(&self.metrics);
         let master_key = Arc::clone(&self.master_key);
         let config = self.config.clone();
+        let sender = self._sender.clone();  // 用于发送响应令牌
         
         tokio::spawn(async move {
             info!("自动接收循环已启动");
@@ -302,10 +303,11 @@ impl TransportEngine {
                         // 路由到处理器
                         match router.route_token(token).await {
                             Ok(Some(response_token)) => {
-                                // 如果处理器返回了响应令牌，这里可以发送它
-                                // 但这需要访问传输层，暂时记录
+                                // 处理器返回了响应令牌，发送回去
                                 debug!("处理器返回了响应令牌: {}", response_token.meta.id);
-                                // TODO: 将响应令牌放入发送队列
+                                if let Err(e) = sender.send(response_token) {
+                                    warn!("发送响应令牌失败: {}", e);
+                                }
                             }
                             Ok(None) => {
                                 debug!("令牌处理完成，无响应");
