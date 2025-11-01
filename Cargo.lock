@@ -434,6 +434,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bey-func",
+ "bey-gui",
  "bey-identity",
  "bey-net",
  "bey-plugin",
@@ -480,6 +481,20 @@ dependencies = [
  "error",
  "serde",
  "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "bey-gui"
+version = "0.1.0"
+dependencies = [
+ "bey-func",
+ "bey-types",
+ "error",
+ "serde",
+ "serde_json",
+ "tauri",
  "tokio",
  "tracing",
 ]

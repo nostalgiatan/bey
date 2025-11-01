@@ -318,6 +318,8 @@ pub struct MdnsDiscoveryStats {
     pub successful_queries: u64,
     /// 失败查询次数
     pub failed_queries: u64,
+    /// 查询超时次数（无响应，正常情况）
+    pub query_timeouts: u64,
     /// 缓存命中次数
     pub cache_hits: u64,
     /// 缓存未命中次数
@@ -708,7 +710,12 @@ impl MdnsDiscovery {
     async fn bind_socket(port: u16, enable_ipv6: bool) -> Result<UdpSocket, ErrorInfo> {
         if enable_ipv6 {
             // 尝试IPv6绑定到正确的IPv6地址
-            match UdpSocket::bind(&format!("[::]:{}", port).parse::<SocketAddr>().unwrap()) {
+            let ipv6_addr = format!("[::]:{}", port).parse::<SocketAddr>()
+                .map_err(|e| ErrorInfo::new(2116, format!("解析IPv6地址失败: {}", e))
+                    .with_category(ErrorCategory::Network)
+                    .with_severity(ErrorSeverity::Error))?;
+            
+            match UdpSocket::bind(&ipv6_addr) {
                 Ok(socket) => {
                     debug!("成功绑定IPv6套接字: [::]:{}", port);
                     return Ok(socket);
@@ -716,7 +723,12 @@ impl MdnsDiscovery {
                 Err(e) => {
                     warn!("IPv6绑定失败: {}, 回退到IPv4", e);
                     // IPv6失败，尝试IPv4
-                    match UdpSocket::bind(&format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap()) {
+                    let ipv4_addr = format!("0.0.0.0:{}", port).parse::<SocketAddr>()
+                        .map_err(|e| ErrorInfo::new(2116, format!("解析IPv4地址失败: {}", e))
+                            .with_category(ErrorCategory::Network)
+                            .with_severity(ErrorSeverity::Error))?;
+                    
+                    match UdpSocket::bind(&ipv4_addr) {
                         Ok(socket) => {
                             debug!("成功绑定IPv4套接字(回退): 0.0.0.0:{}", port);
                             return Ok(socket);
@@ -731,7 +743,12 @@ impl MdnsDiscovery {
             }
         } else {
             // 默认使用IPv4
-            match UdpSocket::bind(&format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap()) {
+            let ipv4_addr = format!("0.0.0.0:{}", port).parse::<SocketAddr>()
+                .map_err(|e| ErrorInfo::new(2116, format!("解析IPv4地址失败: {}", e))
+                    .with_category(ErrorCategory::Network)
+                    .with_severity(ErrorSeverity::Error))?;
+            
+            match UdpSocket::bind(&ipv4_addr) {
                 Ok(socket) => {
                     debug!("成功绑定IPv4套接字: 0.0.0.0:{}", port);
                     return Ok(socket);
@@ -1224,15 +1241,14 @@ impl MdnsDiscovery {
             if start_time.elapsed() > timeout {
                 debug!("查询响应超时: {}ms (无其他设备响应，属正常情况)", timeout.as_millis());
 
-                // 更新统计
+                // 更新统计 - 超时是正常的无响应情况
                 {
                     let mut stats = self.stats.write().await;
-                    stats.failed_queries += 1;
+                    stats.query_timeouts += 1;
                 }
 
-                return Err(ErrorInfo::new(2122, "查询响应超时".to_string())
-                    .with_category(ErrorCategory::Network)
-                    .with_severity(ErrorSeverity::Warning));
+                // 返回空响应列表，而不是错误（超时是正常情况）
+                return Ok(Vec::new());
             }
 
             // 短暂一段时间

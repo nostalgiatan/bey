@@ -107,11 +107,13 @@ impl BeyAppManager {
 
         // 初始化网络引擎（只创建一次）
         let device_id = self.core_app.local_device().device_id.clone();
-        let mut net_config = bey_net::engine::EngineConfig::default();
-        net_config.name = device_id.clone();
-        net_config.port = self.config.network_port;
-        net_config.enable_encryption = true;  // 启用加密
-        net_config.enable_auth = false;  // 禁用引擎层认证（传输层已处理）
+        let net_config = bey_net::engine::EngineConfig {
+            name: device_id.clone(),
+            port: self.config.network_port,
+            enable_encryption: true,  // 启用加密
+            enable_auth: false,  // 禁用引擎层认证（传输层已处理）
+            ..Default::default()
+        };
 
         let net_engine = bey_net::engine::TransportEngine::new(net_config).await
             .map_err(|e| ErrorInfo::new(2002, format!("初始化网络引擎失败: {:?}", e)))?;
