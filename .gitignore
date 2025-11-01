@@ -3,3 +3,5 @@ target/
 *.db
 *.beycloud
 certs/
+certificates/
+crates/
