@@ -491,12 +491,14 @@ version = "0.1.0"
 dependencies = [
  "bey-func",
  "bey-types",
+ "chrono",
  "error",
  "serde",
  "serde_json",
  "tauri",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
