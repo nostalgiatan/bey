@@ -8,17 +8,21 @@
 //! - 实时日志查看器
 //! - 状态监控面板
 //! - 交互式命令输入
+//! - 消息发送功能（私信、群聊、广播）
+//! - 剪切板同步功能
+//! - 文件传输功能
 //!
 //! ## 使用示例
 //!
 //! ```no_run
 //! use bey_tui::TuiApp;
 //! use bey_func::BeyFuncManager;
+//! use std::sync::Arc;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let manager = BeyFuncManager::new("my_device".to_string(), "./storage".into()).await?;
-//!     let mut tui = TuiApp::new(manager);
+//!     let manager = BeyFuncManager::new("my_device", "./storage").await?;
+//!     let mut tui = TuiApp::new(Arc::new(manager));
 //!     tui.run().await?;
 //!     Ok(())
 //! }
@@ -54,6 +58,33 @@ pub enum AppMode {
     Command,
     /// 帮助模式
     Help,
+    /// 操作菜单模式
+    OperationMenu,
+    /// 输入表单模式
+    InputForm(OperationType),
+}
+
+/// 操作类型
+#[derive(Debug, Clone, PartialEq)]
+pub enum OperationType {
+    /// 发送私信
+    SendPrivateMessage,
+    /// 发送群聊消息
+    SendGroupMessage,
+    /// 广播消息
+    BroadcastMessage,
+    /// 添加剪切板
+    AddClipboard,
+    /// 同步剪切板到对等设备
+    SyncClipboardToPeer,
+    /// 同步剪切板到群组
+    SyncClipboardToGroup,
+    /// 上传文件到云存储
+    UploadToCloud,
+    /// 从云存储下载文件
+    DownloadFromCloud,
+    /// 发送文件到对等设备
+    SendFileToPeer,
 }
 
 /// TUI 日志条目
@@ -109,6 +140,12 @@ pub struct TuiApp {
     should_quit: bool,
     /// 选中的设备索引
     selected_device: usize,
+    /// 选中的操作索引
+    selected_operation: usize,
+    /// 表单输入字段
+    form_fields: Vec<(String, String)>, // (field_name, field_value)
+    /// 当前聚焦的表单字段
+    focused_field: usize,
 }
 
 impl TuiApp {
@@ -130,6 +167,9 @@ impl TuiApp {
             max_logs: 1000,
             should_quit: false,
             selected_device: 0,
+            selected_operation: 0,
+            form_fields: Vec::new(),
+            focused_field: 0,
         }
     }
 
@@ -263,6 +303,10 @@ impl TuiApp {
                         self.command_input.clear();
                     }
                     KeyCode::Char('?') => self.mode = AppMode::Help,
+                    KeyCode::Char('o') | KeyCode::Char('O') => {
+                        self.mode = AppMode::OperationMenu;
+                        self.selected_operation = 0;
+                    }
                     KeyCode::Up => {
                         if self.selected_device > 0 {
                             self.selected_device -= 1;
@@ -270,6 +314,59 @@ impl TuiApp {
                     }
                     KeyCode::Down => {
                         self.selected_device += 1;
+                    }
+                    _ => {}
+                }
+            }
+            AppMode::OperationMenu => {
+                match key.code {
+                    KeyCode::Up => {
+                        if self.selected_operation > 0 {
+                            self.selected_operation -= 1;
+                        }
+                    }
+                    KeyCode::Down => {
+                        if self.selected_operation < 8 {
+                            self.selected_operation += 1;
+                        }
+                    }
+                    KeyCode::Enter => {
+                        self.start_operation(self.selected_operation).await;
+                    }
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        self.mode = AppMode::Normal;
+                    }
+                    _ => {}
+                }
+            }
+            AppMode::InputForm(ref op_type) => {
+                match key.code {
+                    KeyCode::Enter => {
+                        self.execute_operation(op_type.clone()).await;
+                        self.mode = AppMode::Normal;
+                    }
+                    KeyCode::Esc => {
+                        self.mode = AppMode::OperationMenu;
+                    }
+                    KeyCode::Tab => {
+                        if self.focused_field < self.form_fields.len() - 1 {
+                            self.focused_field += 1;
+                        }
+                    }
+                    KeyCode::BackTab => {
+                        if self.focused_field > 0 {
+                            self.focused_field -= 1;
+                        }
+                    }
+                    KeyCode::Char(c) => {
+                        if !self.form_fields.is_empty() {
+                            self.form_fields[self.focused_field].1.push(c);
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        if !self.form_fields.is_empty() {
+                            self.form_fields[self.focused_field].1.pop();
+                        }
                     }
                     _ => {}
                 }
@@ -337,6 +434,243 @@ impl TuiApp {
         }
     }
 
+    /// 启动操作并准备输入表单
+    async fn start_operation(&mut self, operation_index: usize) {
+        self.form_fields.clear();
+        self.focused_field = 0;
+
+        let op_type = match operation_index {
+            0 => {
+                self.form_fields.push(("设备ID".to_string(), String::new()));
+                self.form_fields.push(("消息内容".to_string(), String::new()));
+                OperationType::SendPrivateMessage
+            }
+            1 => {
+                self.form_fields.push(("群组ID".to_string(), String::new()));
+                self.form_fields.push(("消息内容".to_string(), String::new()));
+                OperationType::SendGroupMessage
+            }
+            2 => {
+                self.form_fields.push(("消息内容".to_string(), String::new()));
+                OperationType::BroadcastMessage
+            }
+            3 => {
+                self.form_fields.push(("内容类型".to_string(), String::new()));
+                self.form_fields.push(("内容".to_string(), String::new()));
+                OperationType::AddClipboard
+            }
+            4 => {
+                self.form_fields.push(("设备ID".to_string(), String::new()));
+                OperationType::SyncClipboardToPeer
+            }
+            5 => {
+                self.form_fields.push(("群组ID".to_string(), String::new()));
+                OperationType::SyncClipboardToGroup
+            }
+            6 => {
+                self.form_fields.push(("文件名".to_string(), String::new()));
+                self.form_fields.push(("文件内容".to_string(), String::new()));
+                OperationType::UploadToCloud
+            }
+            7 => {
+                self.form_fields.push(("文件哈希".to_string(), String::new()));
+                OperationType::DownloadFromCloud
+            }
+            8 => {
+                self.form_fields.push(("设备ID".to_string(), String::new()));
+                self.form_fields.push(("文件名".to_string(), String::new()));
+                self.form_fields.push(("文件内容".to_string(), String::new()));
+                OperationType::SendFileToPeer
+            }
+            _ => return,
+        };
+
+        self.mode = AppMode::InputForm(op_type);
+    }
+
+    /// 执行操作
+    async fn execute_operation(&mut self, op_type: OperationType) {
+        match op_type {
+            OperationType::SendPrivateMessage => {
+                if self.form_fields.len() >= 2 {
+                    let peer_id = &self.form_fields[0].1;
+                    let content = self.form_fields[1].1.as_bytes();
+                    match self.manager.send_private_message(peer_id, content).await {
+                        Ok(msg_id) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("私信已发送到 {}, ID: {}", peer_id, msg_id),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("发送私信失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::SendGroupMessage => {
+                if self.form_fields.len() >= 2 {
+                    let group_id = &self.form_fields[0].1;
+                    let content = self.form_fields[1].1.as_bytes();
+                    match self.manager.send_group_message(group_id, content).await {
+                        Ok(msg_id) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("群聊消息已发送到 {}, ID: {}", group_id, msg_id),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("发送群聊消息失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::BroadcastMessage => {
+                if !self.form_fields.is_empty() {
+                    let content = self.form_fields[0].1.as_bytes();
+                    match self.manager.broadcast_message(content).await {
+                        Ok(count) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("广播消息已发送到 {} 个设备", count),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("广播消息失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::AddClipboard => {
+                if self.form_fields.len() >= 2 {
+                    let content_type = &self.form_fields[0].1;
+                    let content = self.form_fields[1].1.as_bytes();
+                    match self.manager.add_clipboard(content_type, content).await {
+                        Ok(entry_id) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("剪切板内容已添加, ID: {}", entry_id),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("添加剪切板失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::SyncClipboardToPeer => {
+                if !self.form_fields.is_empty() {
+                    let peer_id = &self.form_fields[0].1;
+                    match self.manager.sync_clipboard_to_peer(peer_id).await {
+                        Ok(_) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("剪切板已同步到 {}", peer_id),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("同步剪切板失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::SyncClipboardToGroup => {
+                if !self.form_fields.is_empty() {
+                    let group_id = &self.form_fields[0].1;
+                    match self.manager.sync_clipboard_to_group(group_id).await {
+                        Ok(_) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("剪切板已同步到群组 {}", group_id),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("同步剪切板到群组失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::UploadToCloud => {
+                if self.form_fields.len() >= 2 {
+                    let filename = &self.form_fields[0].1;
+                    let data = self.form_fields[1].1.as_bytes();
+                    match self.manager.upload_to_cloud(filename, data).await {
+                        Ok(file_hash) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("文件已上传到云存储, 哈希: {}", file_hash),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("上传文件失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::DownloadFromCloud => {
+                if !self.form_fields.is_empty() {
+                    let file_hash = &self.form_fields[0].1;
+                    match self.manager.download_from_cloud(file_hash).await {
+                        Ok(data) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("文件已从云存储下载, 大小: {} 字节", data.len()),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("下载文件失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+            OperationType::SendFileToPeer => {
+                if self.form_fields.len() >= 3 {
+                    let peer_id = &self.form_fields[0].1;
+                    let filename = &self.form_fields[1].1;
+                    let data = self.form_fields[2].1.as_bytes();
+                    match self.manager.send_file_to_peer(peer_id, filename, data).await {
+                        Ok(_) => {
+                            self.add_log(
+                                LogLevel::Info,
+                                format!("文件 {} 已发送到 {}", filename, peer_id),
+                            );
+                        }
+                        Err(e) => {
+                            self.add_log(
+                                LogLevel::Error,
+                                format!("发送文件失败: {}", e),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// 定时更新
     async fn on_tick(&mut self) {
         // 这里可以添加定时任务，比如更新设备列表等
@@ -369,6 +703,12 @@ impl TuiApp {
             }
             AppMode::Help => {
                 self.render_help(f, chunks[1]);
+            }
+            AppMode::OperationMenu => {
+                self.render_operation_menu(f, chunks[1]);
+            }
+            AppMode::InputForm(_) => {
+                self.render_input_form(f, chunks[1]);
             }
             AppMode::Command => {
                 // 命令模式下也显示主内容
@@ -460,6 +800,7 @@ impl TuiApp {
             Line::from(""),
             Line::from("  q         - 退出程序"),
             Line::from("  Ctrl+C    - 退出程序"),
+            Line::from("  o         - 打开操作菜单"),
             Line::from("  :         - 进入命令模式"),
             Line::from("  ?         - 显示/隐藏帮助"),
             Line::from("  ↑/↓       - 选择设备"),
@@ -475,6 +816,23 @@ impl TuiApp {
             Line::from("  :clear    - 清空日志"),
             Line::from("  :devices  - 列出设备"),
             Line::from("  :help     - 显示帮助"),
+            Line::from(""),
+            Line::from(Span::styled(
+                "操作菜单 (按 'o' 打开)",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from("  1. 发送私信"),
+            Line::from("  2. 发送群聊消息"),
+            Line::from("  3. 广播消息"),
+            Line::from("  4. 添加剪切板"),
+            Line::from("  5. 同步剪切板到对等设备"),
+            Line::from("  6. 同步剪切板到群组"),
+            Line::from("  7. 上传文件到云存储"),
+            Line::from("  8. 从云存储下载文件"),
+            Line::from("  9. 发送文件到对等设备"),
             Line::from(""),
             Line::from("按 '?' 或 ESC 返回"),
         ];
@@ -494,11 +852,13 @@ impl TuiApp {
     /// 渲染状态栏
     fn render_status(&self, f: &mut Frame, area: Rect) {
         let mode_text = match self.mode {
-            AppMode::Normal => "正常模式 | 按 ':' 输入命令 | 按 '?' 查看帮助 | 按 'q' 退出",
+            AppMode::Normal => "正常模式 | 按 'o' 打开操作菜单 | 按 ':' 输入命令 | 按 '?' 查看帮助 | 按 'q' 退出",
             AppMode::Command => {
                 return self.render_command_input(f, area);
             }
             AppMode::Help => "帮助模式 | 按 '?' 或 ESC 返回",
+            AppMode::OperationMenu => "操作菜单 | ↑↓ 选择 | Enter 确认 | ESC 返回",
+            AppMode::InputForm(_) => "输入表单 | Tab 切换字段 | Enter 提交 | ESC 返回菜单",
         };
 
         let status = Paragraph::new(mode_text)
@@ -519,6 +879,98 @@ impl TuiApp {
             );
 
         f.render_widget(input, area);
+    }
+
+    /// 渲染操作菜单
+    fn render_operation_menu(&self, f: &mut Frame, area: Rect) {
+        let operations = vec![
+            "1. 发送私信",
+            "2. 发送群聊消息",
+            "3. 广播消息",
+            "4. 添加剪切板",
+            "5. 同步剪切板到对等设备",
+            "6. 同步剪切板到群组",
+            "7. 上传文件到云存储",
+            "8. 从云存储下载文件",
+            "9. 发送文件到对等设备",
+        ];
+
+        let items: Vec<ListItem> = operations
+            .iter()
+            .enumerate()
+            .map(|(i, op)| {
+                let style = if i == self.selected_operation {
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                ListItem::new(*op).style(style)
+            })
+            .collect();
+
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .title("操作菜单 - 选择一个操作")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Cyan)),
+            )
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">> ");
+
+        f.render_widget(list, area);
+    }
+
+    /// 渲染输入表单
+    fn render_input_form(&self, f: &mut Frame, area: Rect) {
+        let mut lines = Vec::new();
+        lines.push(Line::from(""));
+
+        for (i, (field_name, field_value)) in self.form_fields.iter().enumerate() {
+            let is_focused = i == self.focused_field;
+            let style = if is_focused {
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+
+            let prefix = if is_focused { "▶ " } else { "  " };
+            lines.push(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::styled(format!("{}: ", field_name), style),
+            ]));
+            
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(field_value.clone(), style),
+                Span::styled(if is_focused { "█" } else { "" }, style),
+            ]));
+            lines.push(Line::from(""));
+        }
+
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Tab - 切换字段 | Enter - 提交 | ESC - 返回",
+            Style::default().fg(Color::Gray),
+        )));
+
+        let form = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .title("输入表单")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Green)),
+            )
+            .wrap(Wrap { trim: false });
+
+        f.render_widget(form, area);
     }
 }
 
