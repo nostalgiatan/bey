@@ -121,10 +121,34 @@ let stats = metrics.get_metrics().await;
 
 ## 快速开始
 
-### 基本使用
+### 基本使用（推荐方式 - 使用消息处理器）
+
+从版本 0.1.0 开始，推荐使用消息处理器模式而不是手动调用 `receive()`：
 
 ```rust
-use bey_net::{TransportEngine, EngineConfig};
+use bey_net::{TransportEngine, EngineConfig, TokenHandler, Token, NetResult};
+use std::sync::Arc;
+
+// 定义消息处理器
+struct MyMessageHandler;
+
+#[async_trait::async_trait]
+impl TokenHandler for MyMessageHandler {
+    fn token_types(&self) -> Vec<String> {
+        vec!["chat_message".to_string(), "notification".to_string()]
+    }
+    
+    async fn handle_token(&self, token: Token) -> NetResult<Option<Token>> {
+        println!("收到消息: {} 来自 {}", 
+            token.meta.token_type, 
+            token.meta.sender_id);
+        
+        // 处理消息
+        // ...
+        
+        Ok(None)  // 或返回响应令牌
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -132,18 +156,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = EngineConfig::default();
     let engine = TransportEngine::new(config).await?;
     
-    // 启动服务器
+    // 注册消息处理器（引擎会自动接收并路由消息）
+    engine.register_handler(Arc::new(MyMessageHandler)).await?;
+    
+    // 启动服务器（自动开始接收消息）
     engine.start_server().await?;
     
     // 发送消息（自动：加密、优先级、流量控制）
-    engine.send_to("device-name", data, "message").await?;
+    engine.send_to("device-name", data, "chat_message").await?;
     
-    // 接收消息（自动：解密）
-    if let Some((sender, msg_type, data)) = engine.receive().await? {
-        println!("收到来自 {}: {}", sender, msg_type);
-    }
+    // 引擎会自动接收消息并调用注册的处理器
+    // 不需要手动调用 receive()
     
     Ok(())
+}
+```
+
+### 传统方式（已废弃，但仍可用）
+
+⚠️ **注意**: `receive()` API 已废弃，推荐使用上述消息处理器模式。
+
+```rust,ignore
+// 已废弃：不推荐使用
+#[allow(deprecated)]
+if let Some((sender, msg_type, data)) = engine.receive().await? {
+    println!("收到来自 {}: {}", sender, msg_type);
 }
 ```
 
@@ -365,8 +402,31 @@ mdns = "3.0"
 
 - `bey-transport`: QUIC传输层
 - `bey-identity`: 身份认证和证书管理
-- `bey-file-transfer`: 文件传输（使用bey-net）
-- `bey-storage`: 存储服务（使用bey-net）
+- ~~`bey-file-transfer`~~: 已移除，文件传输功能已集成到 bey-net
+- `bey-storage`: 存储服务（使用bey-net进行文件传输）
+
+## API 变更历史
+
+### v0.1.0
+
+**重大变更：消息接收模式重构**
+
+- ✅ **新增**: 自动接收循环 - 引擎启动后自动在后台接收消息
+- ✅ **新增**: `register_handler()` API - 推荐的消息处理方式
+- ⚠️ **废弃**: `receive()` 和 `receive_blocking()` - 仍可用但不推荐
+- 📝 **迁移指南**: 参见 "快速开始" 部分的示例代码
+
+**原因**: 手动调用 `receive()` 的模式不符合事件驱动架构。新的处理器模式：
+- 更符合Rust异步编程习惯
+- 自动化处理，减少开发者负担
+- 支持多种消息类型的独立处理
+- 更好的性能和扩展性
+
+**文件传输模块移除**
+
+- ❌ **移除**: `bey-file-transfer` 模块
+- ✅ **原因**: 功能已被 bey-net 完全覆盖
+- ✅ **替代方案**: 使用 `send_large_file()` 和 `receive_large_file()`
 
 ## 联系方式
 

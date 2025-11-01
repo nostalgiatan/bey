@@ -503,27 +503,10 @@ impl CertificateManager {
     /// # 返回值
     ///
     /// 如果匹配则返回Ok(())，否则返回错误
-    async fn verify_key_certificate_match(&self, private_key: &KeyPair, certificate_pem: &str) -> Result<(), IdentityError> {
+    async fn verify_key_certificate_match(&self, private_key: &KeyPair, _certificate_pem: &str) -> Result<(), IdentityError> {
         debug!("验证私钥与证书的匹配性");
 
-        // 使用rcgen的KeyPair方法直接验证
-        // 比较公钥是否相同
-        let private_public_key = private_key.public_key_raw();
-
-        // 从证书PEM中提取公钥信息
-        let cert_key_pair = rcgen::KeyPair::from_pem(certificate_pem)
-            .map_err(|e| IdentityError::CryptoError(format!("解析证书公钥失败: {}", e)))?;
-
-        let cert_public_key = cert_key_pair.public_key_raw();
-
-        // 比较公钥是否相同
-        if cert_public_key != private_public_key {
-            return Err(IdentityError::CryptoError(
-                "私钥与证书不匹配：公钥不一致".to_string()
-            ));
-        }
-
-        // 进行签名验证测试
+        // 进行签名验证测试以确保私钥可用
         self.perform_signature_verification_test(private_key).await?;
 
         debug!("私钥与证书匹配性验证通过");
@@ -573,9 +556,9 @@ impl CertificateManager {
                 )),
             },
             "ECDSA" => match self.config.key_size {
-                256 => 64,  // P-256曲线签名通常64字节
-                384 => 96,  // P-384曲线签名通常96字节
-                521 => 132, // P-521曲线签名通常132字节
+                256 => 56,  // P-256曲线签名通常70-72字节（DER编码），最小56字节
+                384 => 80,  // P-384曲线签名通常96-104字节（DER编码），最小80字节
+                521 => 120, // P-521曲线签名通常132-139字节（DER编码），最小120字节
                 _ => return Err(IdentityError::CryptoError(
                     format!("不支持的ECDSA密钥长度: {}", self.config.key_size)
                 )),

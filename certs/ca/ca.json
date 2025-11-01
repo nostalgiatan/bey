@@ -1,0 +1,22 @@
+{
+  "certificate_id": "ca",
+  "device_identifier": "ca",
+  "fingerprint": "4a6d3ad644a7d84dc9e44a27794784ee2df998298a2e14183e098e81717572f5",
+  "certificate_pem": "-----BEGIN CERTIFICATE-----\nMIIB3jCCAYSgAwIBAgIUfO4EJw7a9LBpk33gJkScZJItv9kwCgYIKoZIzj0EAwIw\nTDELMAkGA1UEBgwCQ04xDDAKBgNVBAoMA0JFWTEeMBwGA1UECwwVQ2VydGlmaWNh\ndGUgQXV0aG9yaXR5MQ8wDQYDVQQDDAZCRVkgQ0EwIBcNNzUwMTAxMDAwMDAwWhgP\nNDA5NjAxMDEwMDAwMDBaMEwxCzAJBgNVBAYMAkNOMQwwCgYDVQQKDANCRVkxHjAc\nBgNVBAsMFUNlcnRpZmljYXRlIEF1dGhvcml0eTEPMA0GA1UEAwwGQkVZIENBMFkw\nEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE49ZQO7n0B+UV9AzJWT0NpUJUX1yHFV7q\ntxedO6LG70Ip3if/EmpPRgxTdhaEkCX+mZ4mgU9zZ6qHRN6O3KoBdqNCMEAwDgYD\nVR0PAQH/BAQDAgGGMB0GA1UdDgQWBBTWbk08vUI3CrCDQKDmoeaMSOPrqTAPBgNV\nHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0gAMEUCIQDP/NDKU4yXPmRNTXT10WbF\nMmttBPTf6y6CO5bavuow6gIgRNGb2gbrHnhbGAd3l64asur8cwIKz11rP9Xlzb0L\nXNI=\n-----END CERTIFICATE-----\n",
+  "private_key_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXVz+u7eP6Dkk2CA6\n5deS7Mn8obpa7Fd42rP/Hy6dkEuhRANCAATj1lA7ufQH5RX0DMlZPQ2lQlRfXIcV\nXuq3F507osbvQineJ/8Sak9GDFN2FoSQJf6ZniaBT3NnqodE3o7cqgF2\n-----END PRIVATE KEY-----\n",
+  "issued_at": {
+    "secs_since_epoch": 1761958414,
+    "nanos_since_epoch": 236581201
+  },
+  "expires_at": {
+    "secs_since_epoch": 2077318414,
+    "nanos_since_epoch": 236581302
+  },
+  "certificate_type": "RootCA",
+  "issuer_identifier": "ca",
+  "subject_identifier": "CN=BEY CA, O=BEY, OU=Certificate Authority",
+  "serial_number": null,
+  "status": "Valid",
+  "key_algorithm": "RSA-2048",
+  "version": 3
+}

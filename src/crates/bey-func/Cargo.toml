@@ -1,0 +1,24 @@
+[package]
+name = "bey-func"
+version = "0.1.0"
+edition = "2021"
+authors = ["BEY Team"]
+description = "BEY 分布式功能模块 - 集成网络、存储、消息和剪切板的高级API"
+
+[dependencies]
+# BEY 模块
+bey-net = { path = "../bey-net" }
+bey-storage = { path = "../bey-storage" }
+error = { path = "../error" }
+
+# 核心依赖
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+
+# 异步支持
+async-trait = "0.1"
+
+[dev-dependencies]
+tempfile = "3.0"

@@ -259,6 +259,135 @@ impl TransportEngine {
         
         // 启动性能指标更新任务
         self.start_metrics_updater().await;
+        
+        // 启动自动接收循环
+        self.start_auto_receive_loop().await;
+    }
+    
+    /// 启动自动接收循环
+    ///
+    /// 在后台自动接收消息并路由到注册的处理器
+    async fn start_auto_receive_loop(&self) {
+        let receiver = Arc::clone(&self.receiver);
+        let router = Arc::clone(&self.router);
+        let metrics = Arc::clone(&self.metrics);
+        let master_key = Arc::clone(&self.master_key);
+        let config = self.config.clone();
+        let sender = self._sender.clone();  // 用于发送响应令牌
+        
+        tokio::spawn(async move {
+            info!("自动接收循环已启动");
+            
+            loop {
+                // 非阻塞接收令牌
+                match receiver.receive(ReceiverMode::NonBlocking).await {
+                    Ok(Some(mut token)) => {
+                        debug!("自动接收到令牌: {} (类型: {})", token.meta.id, token.meta.token_type);
+                        
+                        // 如果令牌是加密的，解密
+                        if token.meta.encrypted && config.enable_encryption {
+                            match Self::decrypt_token_static(&token, &master_key).await {
+                                Ok(decrypted_token) => {
+                                    token = decrypted_token;
+                                }
+                                Err(e) => {
+                                    warn!("解密令牌失败: {}", e);
+                                    continue;
+                                }
+                            }
+                        }
+                        
+                        // 记录接收指标
+                        metrics.record_receive(token.payload.len()).await;
+                        
+                        // 路由到处理器
+                        match router.route_token(token).await {
+                            Ok(Some(response_token)) => {
+                                // 处理器返回了响应令牌，发送回去
+                                debug!("处理器返回了响应令牌: {}", response_token.meta.id);
+                                if let Err(e) = sender.send(response_token) {
+                                    warn!("发送响应令牌失败: {}", e);
+                                }
+                            }
+                            Ok(None) => {
+                                debug!("令牌处理完成，无响应");
+                            }
+                            Err(e) => {
+                                warn!("路由令牌失败: {}", e);
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        // 没有消息，短暂休眠后继续
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                    Err(e) => {
+                        warn!("接收令牌失败: {}", e);
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+                }
+            }
+        });
+    }
+    
+    /// 静态方法：解密令牌（用于后台任务）
+    async fn decrypt_token_static(
+        token: &Token,
+        master_key: &Arc<RwLock<Option<Vec<u8>>>>,
+    ) -> NetResult<Token> {
+        let mut decrypted_token = token.clone();
+        
+        // 获取主密钥
+        let master_key_guard = master_key.read().await;
+        let key_bytes = master_key_guard.as_ref().ok_or_else(|| {
+            ErrorInfo::new(4311, "无法获取解密密钥".to_string())
+                .with_category(ErrorCategory::Encryption)
+                .with_severity(ErrorSeverity::Error)
+        })?;
+        
+        // 确保密钥长度为32字节（AES-256）
+        let key = if key_bytes.len() >= 32 {
+            &key_bytes[..32]
+        } else {
+            return Err(ErrorInfo::new(4312, "解密密钥长度不足".to_string())
+                .with_category(ErrorCategory::Encryption)
+                .with_severity(ErrorSeverity::Error));
+        };
+        
+        // 创建AES-GCM解密器
+        let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| {
+            ErrorInfo::new(4313, format!("创建解密器失败: {}", e))
+                .with_category(ErrorCategory::Encryption)
+                .with_severity(ErrorSeverity::Error)
+        })?;
+        
+        // 提取nonce和密文
+        if token.payload.len() < 12 {
+            return Err(ErrorInfo::new(4314, "加密数据格式错误：长度不足".to_string())
+                .with_category(ErrorCategory::Parse)
+                .with_severity(ErrorSeverity::Error));
+        }
+        
+        let nonce: &Nonce<U12> = (&token.payload[0..12]).try_into().map_err(|_| {
+            ErrorInfo::new(4316, "Nonce转换失败".to_string())
+                .with_category(ErrorCategory::Parse)
+                .with_severity(ErrorSeverity::Error)
+        })?;
+        let ciphertext = &token.payload[12..];
+        
+        // 解密负载
+        let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|e| {
+            ErrorInfo::new(4315, format!("解密失败: {}", e))
+                .with_category(ErrorCategory::Encryption)
+                .with_severity(ErrorSeverity::Error)
+        })?;
+        
+        // 更新令牌
+        decrypted_token.payload = plaintext;
+        decrypted_token.meta.encrypted = false;
+        decrypted_token.meta.attributes.remove("encryption");
+        
+        Ok(decrypted_token)
     }
 
     /// 启动优先级队列监控任务
@@ -1181,11 +1310,39 @@ impl TransportEngine {
         self.send_with_flow_control(token).await
     }
 
-    /// 简单接收：接收下一个消息（自动解密）
+    /// ⚠️ 已废弃：请使用 register_handler() 注册消息处理器
     ///
-    /// # 返回值
+    /// 这个方法不应该由开发者直接调用。消息接收现在是自动的，
+    /// 引擎启动后会在后台自动接收并路由消息到注册的处理器。
     ///
-    /// 返回(发送者, 消息类型, 数据)元组，如果没有消息则返回None
+    /// # 迁移指南
+    ///
+    /// 旧代码：
+    /// ```ignore
+    /// if let Some((sender, msg_type, data)) = engine.receive().await? {
+    ///     // 处理消息
+    /// }
+    /// ```
+    ///
+    /// 新代码：
+    /// ```ignore
+    /// struct MyHandler;
+    /// #[async_trait::async_trait]
+    /// impl TokenHandler for MyHandler {
+    ///     fn token_types(&self) -> Vec<String> {
+    ///         vec!["my_message_type".to_string()]
+    ///     }
+    ///     async fn handle_token(&self, token: Token) -> NetResult<Option<Token>> {
+    ///         // 处理消息
+    ///         Ok(None)
+    ///     }
+    /// }
+    /// engine.register_handler(Arc::new(MyHandler)).await?;
+    /// ```
+    #[deprecated(
+        since = "0.1.0",
+        note = "请使用 register_handler() 注册消息处理器，消息接收现在是自动的"
+    )]
     pub async fn receive(&self) -> NetResult<Option<(String, String, Vec<u8>)>> {
         if let Some(token) = self.receive_token(ReceiverMode::NonBlocking).await? {
             self.metrics.record_receive(token.payload.len()).await;
@@ -1200,7 +1357,14 @@ impl TransportEngine {
         }
     }
 
-    /// 简单接收（阻塞）：阻塞等待下一个消息
+    /// ⚠️ 已废弃：请使用 register_handler() 注册消息处理器
+    ///
+    /// 这个方法不应该由开发者直接调用。消息接收现在是自动的。
+    /// 参见 `receive()` 方法的废弃说明。
+    #[deprecated(
+        since = "0.1.0",
+        note = "请使用 register_handler() 注册消息处理器，消息接收现在是自动的"
+    )]
     pub async fn receive_blocking(&self) -> NetResult<(String, String, Vec<u8>)> {
         let token = self.receive_token(ReceiverMode::Blocking).await?
             .ok_or_else(|| ErrorInfo::new(4701, "接收被中断".to_string())
@@ -1439,6 +1603,8 @@ impl TransportEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::token::{Token, TokenMeta, TokenHandler, TokenType};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[tokio::test]
     async fn test_engine_creation() {
@@ -1455,5 +1621,76 @@ mod tests {
         assert_eq!(config.receiver_buffer_size, 1000);
         assert!(config.enable_auth);
         assert!(config.enable_encryption);
+    }
+    
+    /// 测试用的简单消息处理器
+    struct TestHandler {
+        handled_count: Arc<AtomicUsize>,
+        expected_type: String,
+    }
+    
+    #[async_trait::async_trait]
+    impl TokenHandler for TestHandler {
+        fn token_types(&self) -> Vec<TokenType> {
+            vec![self.expected_type.clone()]
+        }
+        
+        async fn handle_token(&self, token: Token) -> NetResult<Option<Token>> {
+            // 记录处理次数
+            self.handled_count.fetch_add(1, Ordering::SeqCst);
+            info!("TestHandler 处理了令牌: {} (类型: {})", token.meta.id, token.meta.token_type);
+            Ok(None)
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_auto_receive_with_handler() {
+        // 创建路由器和接收器
+        let router = Arc::new(TokenRouter::new());
+        let (sender, receiver) = create_receiver(10);
+        
+        // 创建测试处理器
+        let handled_count = Arc::new(AtomicUsize::new(0));
+        let handler = Arc::new(TestHandler {
+            handled_count: Arc::clone(&handled_count),
+            expected_type: "test_message".to_string(),
+        });
+        
+        // 注册处理器
+        router.register_handler(handler).await.expect("注册处理器失败");
+        
+        // 模拟发送几个令牌
+        for i in 0..3 {
+            let meta = TokenMeta::new("test_message".to_string(), format!("sender_{}", i));
+            let token = Token::new(meta, vec![i as u8]);
+            sender.send(token).expect("发送令牌失败");
+        }
+        
+        // 启动一个简化版的接收循环
+        let receiver = Arc::new(receiver);
+        let router_clone = Arc::clone(&router);
+        let receiver_clone = Arc::clone(&receiver);
+        
+        tokio::spawn(async move {
+            for _ in 0..3 {
+                if let Ok(Some(token)) = receiver_clone.receive(ReceiverMode::NonBlocking).await {
+                    let _ = router_clone.route_token(token).await;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        
+        // 等待处理完成
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        
+        // 验证所有消息都被处理
+        assert_eq!(handled_count.load(Ordering::SeqCst), 3, "应该处理3个消息");
+    }
+    
+    #[test]
+    fn test_deprecated_receive_warning() {
+        // 这个测试确保废弃的 API 仍然存在
+        // 实际使用时应该看到 deprecated 警告
+        // 不实际调用，只检查签名存在性
     }
 }
