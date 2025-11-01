@@ -305,6 +305,8 @@ pub struct MdnsDiscovery {
     query_counter: Arc<Mutex<u64>>,
     /// 统计信息
     stats: Arc<RwLock<MdnsDiscoveryStats>>,
+    /// IPv6支持状态（用于持久化回退）
+    ipv6_supported: Arc<RwLock<bool>>,
 }
 
 /// mDNS发现统计信息
@@ -391,6 +393,7 @@ impl MdnsDiscovery {
             is_running: Arc::new(RwLock::new(false)),
             query_counter: Arc::new(Mutex::new(0)),
             stats: Arc::new(RwLock::new(MdnsDiscoveryStats::default())),
+            ipv6_supported: Arc::new(RwLock::new(true)), // 默认假设IPv6可用，首次失败后会更新
         };
 
         info!("mDNS发现服务初始化完成");
@@ -704,15 +707,22 @@ impl MdnsDiscovery {
     /// 绑定UDP套接字
     async fn bind_socket(port: u16, enable_ipv6: bool) -> Result<UdpSocket, ErrorInfo> {
         if enable_ipv6 {
-            // 尝试IPv6
-            match UdpSocket::bind(&format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap()) {
-                Ok(socket) => return Ok(socket),
-                Err(_) => {
+            // 尝试IPv6绑定到正确的IPv6地址
+            match UdpSocket::bind(&format!("[::]:{}", port).parse::<SocketAddr>().unwrap()) {
+                Ok(socket) => {
+                    debug!("成功绑定IPv6套接字: [::]:{}", port);
+                    return Ok(socket);
+                },
+                Err(e) => {
+                    warn!("IPv6绑定失败: {}, 回退到IPv4", e);
                     // IPv6失败，尝试IPv4
                     match UdpSocket::bind(&format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap()) {
-                        Ok(socket) => return Ok(socket),
+                        Ok(socket) => {
+                            debug!("成功绑定IPv4套接字(回退): 0.0.0.0:{}", port);
+                            return Ok(socket);
+                        },
                         Err(e) => {
-                            return Err(ErrorInfo::new(2115, format!("绑定UDP端口{}失败: {}", port, e))
+                            return Err(ErrorInfo::new(2115, format!("绑定UDP端口{}失败(IPv4/IPv6都失败): {}", port, e))
                                 .with_category(ErrorCategory::Network)
                                 .with_severity(ErrorSeverity::Error));
                         }
@@ -722,7 +732,10 @@ impl MdnsDiscovery {
         } else {
             // 默认使用IPv4
             match UdpSocket::bind(&format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap()) {
-                Ok(socket) => return Ok(socket),
+                Ok(socket) => {
+                    debug!("成功绑定IPv4套接字: 0.0.0.0:{}", port);
+                    return Ok(socket);
+                },
                 Err(e) => {
                     return Err(ErrorInfo::new(2117, format!("绑定UDP端口{}失败: {}", port, e))
                         .with_category(ErrorCategory::Network)
@@ -886,33 +899,89 @@ impl MdnsDiscovery {
         Ok(())
     }
 
-    /// 发送网络包
+    /// 发送网络包 - 支持IPv4/IPv6双栈fallback，持久化IPv6支持状态
     async fn send_packet(&self, data: &[u8]) -> Result<(), ErrorInfo> {
-        let target_addr = if self.config.enable_ipv6 {
-            (mdns_constants::MDNS_IPV6_MULTICAST, mdns_constants::MDNS_PORT)
+        let ipv6_supported = self.ipv6_supported.read().await;
+
+        let target_addrs = if self.config.enable_ipv6 && *ipv6_supported {
+            // 优先尝试IPv6，失败后回退到IPv4
+            vec![
+                (mdns_constants::MDNS_IPV6_MULTICAST, mdns_constants::MDNS_PORT),
+                (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT),
+            ]
         } else {
-            (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT)
+            // 只使用IPv4（IPv6被禁用或已知不支持）
+            vec![
+                (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT),
+            ]
         };
+        drop(ipv6_supported); // 释放读锁
 
-        let socket_addr_str = if target_addr.0.contains(':') {
-            // IPv6地址需要用方括号包围
-            format!("[{}]:{}", target_addr.0, target_addr.1)
-        } else {
-            // IPv4地址直接使用
-            format!("{}:{}", target_addr.0, target_addr.1)
-        };
+        let mut last_error = None;
 
-        let socket_addr: SocketAddr = socket_addr_str.parse::<SocketAddr>().map_err(|e| {
-            ErrorInfo::new(2118, format!("解析目标地址{}:{}失败: {}", target_addr.0, target_addr.1, e))
-                .with_category(ErrorCategory::Network)
-                .with_severity(ErrorSeverity::Error)
-        })?;
+        for (i, target_addr) in target_addrs.iter().enumerate() {
+            let socket_addr_str = if target_addr.0.contains(':') {
+                // IPv6地址需要用方括号包围
+                format!("[{}]:{}", target_addr.0, target_addr.1)
+            } else {
+                // IPv4地址直接使用
+                format!("{}:{}", target_addr.0, target_addr.1)
+            };
 
-        self.socket.send_to(data, socket_addr)
-            .map_err(|e| ErrorInfo::new(2119, format!("发送mDNS包失败: {}", e))
-                .with_category(ErrorCategory::Network)
-                .with_severity(ErrorSeverity::Error))?;
-        Ok(())
+            let socket_addr: SocketAddr = match socket_addr_str.parse::<SocketAddr>() {
+                Ok(addr) => addr,
+                Err(e) => {
+                    warn!("解析目标地址{}失败: {}", socket_addr_str, e);
+                    last_error = Some(ErrorInfo::new(2118, format!("解析目标地址{}失败: {}", socket_addr_str, e))
+                        .with_category(ErrorCategory::Network)
+                        .with_severity(ErrorSeverity::Error));
+                    continue;
+                }
+            };
+
+            match self.socket.send_to(data, socket_addr) {
+                Ok(_) => {
+                    debug!("成功发送mDNS包到: {} (协议: {})",
+                           socket_addr_str,
+                           if target_addr.0.contains(':') { "IPv6" } else { "IPv4" });
+                    return Ok(());
+                }
+                Err(e) => {
+                    let protocol = if target_addr.0.contains(':') { "IPv6" } else { "IPv4" };
+                    warn!("发送mDNS包失败({}): {} -> {}", protocol, socket_addr_str, e);
+
+                    // 如果是IPv6失败，记录IPv6不支持并持久化该状态
+                    if protocol == "IPv6" && (e.raw_os_error() == Some(97) || e.raw_os_error() == Some(99)) {
+                        // Address family not supported (97) 或 Network is unreachable (99)
+                        warn!("检测到IPv6不支持，持久化回退到IPv4: {}", e);
+                        let mut ipv6_supported = self.ipv6_supported.write().await;
+                        *ipv6_supported = false;
+                        drop(ipv6_supported);
+
+                        // 如果还有IPv4地址可以尝试，继续尝试
+                        if i < target_addrs.len() - 1 {
+                            info!("IPv6已禁用，回退到IPv4");
+                            continue;
+                        }
+                    }
+
+                    last_error = Some(ErrorInfo::new(2119, format!("发送mDNS包失败({}): {}", protocol, e))
+                        .with_category(ErrorCategory::Network)
+                        .with_severity(ErrorSeverity::Error));
+
+                    // 如果不是最后一次尝试，继续尝试下一个地址
+                    if i < target_addrs.len() - 1 {
+                        info!("{}失败，尝试{}", protocol, if protocol == "IPv6" { "IPv4" } else { "下一个地址" });
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // 所有尝试都失败了
+        Err(last_error.unwrap_or_else(|| ErrorInfo::new(2119, "发送mDNS包失败: 未知错误".to_string())
+            .with_category(ErrorCategory::Network)
+            .with_severity(ErrorSeverity::Error)))
     }
 
     /// 启动mDNS查询任务
@@ -925,6 +994,7 @@ impl MdnsDiscovery {
         let query_counter = Arc::clone(&self.query_counter);
         let event_sender = self.event_sender.clone();
         let is_running = Arc::clone(&self.is_running);
+        let ipv6_supported = Arc::clone(&self.ipv6_supported);
 
         tokio::spawn(async move {
             debug!("启动mDNS查询任务");
@@ -943,6 +1013,7 @@ impl MdnsDiscovery {
                     &query_queue,
                     &query_counter,
                     &event_sender,
+                    &ipv6_supported,
                 ).await {
                     warn!("查询BEY服务失败: {}", e);
                 }
@@ -961,6 +1032,7 @@ impl MdnsDiscovery {
         query_queue: &Arc<Mutex<VecDeque<MdnsQuery>>>,
         query_counter: &Arc<Mutex<u64>>,
         _event_sender: &mpsc::UnboundedSender<MdnsDiscoveryEvent>,
+        ipv6_supported: &Arc<RwLock<bool>>,
     ) -> Result<(), ErrorInfo> {
         // 创建PTR查询
         let ptr_query = MdnsQuery {
@@ -986,12 +1058,12 @@ impl MdnsDiscovery {
         }
 
         // 发送查询
-        if let Err(e) = MdnsDiscovery::send_query_internal(socket, &ptr_query).await {
+        if let Err(e) = MdnsDiscovery::send_query_internal(socket, &ptr_query, ipv6_supported).await {
             warn!("发送PTR查询失败: {}", e);
             return Err(e);
         }
 
-        if let Err(e) = MdnsDiscovery::send_query_internal(socket, &srv_query).await {
+        if let Err(e) = MdnsDiscovery::send_query_internal(socket, &srv_query, ipv6_supported).await {
             warn!("发送SRV查询失败: {}", e);
             return Err(e);
         }
@@ -1004,6 +1076,7 @@ impl MdnsDiscovery {
     async fn send_query_internal(
         socket: &UdpSocket,
         query: &MdnsQuery,
+        ipv6_supported: &Arc<RwLock<bool>>,
     ) -> Result<(), ErrorInfo> {
         // 编码查询 - 改进的DNS查询编码实现
         let mut encoded_query = Vec::new();
@@ -1037,32 +1110,85 @@ impl MdnsDiscovery {
         // 查询类 (IN = 1)
         encoded_query.extend_from_slice(&1u16.to_le_bytes());
 
-        // 发送查询
-        let target_addr = if true { // enable_ipv6
-            (mdns_constants::MDNS_IPV6_MULTICAST, mdns_constants::MDNS_PORT)
+        // 根据IPv6支持状态选择目标地址
+        let ipv6_supported_val = ipv6_supported.read().await;
+        let target_addrs = if *ipv6_supported_val {
+            vec![
+                (mdns_constants::MDNS_IPV6_MULTICAST, mdns_constants::MDNS_PORT),
+                (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT),
+            ]
         } else {
-            (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT)
+            vec![
+                (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT),
+            ]
         };
+        drop(ipv6_supported_val); // 释放读锁
 
-        let socket_addr_str = if target_addr.0.contains(':') {
-            // IPv6地址需要用方括号包围
-            format!("[{}]:{}", target_addr.0, target_addr.1)
-        } else {
-            // IPv4地址直接使用
-            format!("{}:{}", target_addr.0, target_addr.1)
-        };
+        let mut last_error = None;
 
-        let socket_addr: SocketAddr = socket_addr_str.parse::<SocketAddr>().map_err(|e| {
-            ErrorInfo::new(2120, format!("解析目标地址{}:{}失败: {}", target_addr.0, target_addr.1, e))
-                .with_category(ErrorCategory::Network)
-                .with_severity(ErrorSeverity::Error)
-        })?;
+        for (i, target_addr) in target_addrs.iter().enumerate() {
+            let socket_addr_str = if target_addr.0.contains(':') {
+                // IPv6地址需要用方括号包围
+                format!("[{}]:{}", target_addr.0, target_addr.1)
+            } else {
+                // IPv4地址直接使用
+                format!("{}:{}", target_addr.0, target_addr.1)
+            };
 
-        socket.send_to(&encoded_query, socket_addr)
-            .map_err(|e| ErrorInfo::new(2121, format!("发送查询包失败: {}", e))
-                .with_category(ErrorCategory::Network)
-                .with_severity(ErrorSeverity::Error))?;
-        Ok(())
+            let socket_addr: SocketAddr = match socket_addr_str.parse::<SocketAddr>() {
+                Ok(addr) => addr,
+                Err(e) => {
+                    warn!("解析目标地址{}失败: {}", socket_addr_str, e);
+                    last_error = Some(ErrorInfo::new(2120, format!("解析目标地址{}失败: {}", socket_addr_str, e))
+                        .with_category(ErrorCategory::Network)
+                        .with_severity(ErrorSeverity::Error));
+                    continue;
+                }
+            };
+
+            match socket.send_to(&encoded_query, socket_addr) {
+                Ok(_) => {
+                    debug!("成功发送查询包到: {} (协议: {})",
+                           socket_addr_str,
+                           if target_addr.0.contains(':') { "IPv6" } else { "IPv4" });
+                    return Ok(());
+                }
+                Err(e) => {
+                    let protocol = if target_addr.0.contains(':') { "IPv6" } else { "IPv4" };
+                    warn!("发送查询包失败({}): {} -> {}", protocol, socket_addr_str, e);
+
+                    // 如果是IPv6失败，记录IPv6不支持并持久化该状态
+                    if protocol == "IPv6" && (e.raw_os_error() == Some(97) || e.raw_os_error() == Some(99)) {
+                        // Address family not supported (97) 或 Network is unreachable (99)
+                        warn!("检测到IPv6不支持，持久化回退到IPv4: {}", e);
+                        let mut ipv6_supported = ipv6_supported.write().await;
+                        *ipv6_supported = false;
+                        drop(ipv6_supported);
+
+                        // 如果还有IPv4地址可以尝试，继续尝试
+                        if i < target_addrs.len() - 1 {
+                            info!("IPv6已禁用，回退到IPv4");
+                            continue;
+                        }
+                    }
+
+                    last_error = Some(ErrorInfo::new(2121, format!("发送查询包失败({}): {}", protocol, e))
+                        .with_category(ErrorCategory::Network)
+                        .with_severity(ErrorSeverity::Error));
+
+                    // 如果不是最后一次尝试，继续尝试下一个地址
+                    if i < target_addrs.len() - 1 {
+                        info!("{}失败，尝试{}", protocol, if protocol == "IPv6" { "IPv4" } else { "下一个地址" });
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // 所有尝试都失败了
+        Err(last_error.unwrap_or_else(|| ErrorInfo::new(2121, "发送查询包失败: 未知错误".to_string())
+            .with_category(ErrorCategory::Network)
+            .with_severity(ErrorSeverity::Error)))
     }
 
     /// 等待查询响应
@@ -1096,7 +1222,7 @@ impl MdnsDiscovery {
 
             // 检查超时
             if start_time.elapsed() > timeout {
-                warn!("查询响应超时: {}ms", timeout.as_millis());
+                debug!("查询响应超时: {}ms (无其他设备响应，属正常情况)", timeout.as_millis());
 
                 // 更新统计
                 {
