@@ -3,7 +3,6 @@
 //! 提供事件分发和订阅功能
 
 use dashmap::DashMap;
-use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use tracing::debug;
 

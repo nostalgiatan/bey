@@ -113,7 +113,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, Duration};
-use tracing::{info, debug, warn, error as log_error};
+use tracing::{info, debug, warn};
 
 // 导出子模块
 pub mod lifecycle;
@@ -232,7 +232,7 @@ struct PluginEntry {
 
 /// 插件性能统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct PluginStats {
+pub struct PluginStats {
     /// 初始化时间（毫秒）
     init_time_ms: u64,
     /// 事件处理次数

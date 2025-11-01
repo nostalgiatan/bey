@@ -111,6 +111,7 @@ impl BeyAppManager {
         net_config.name = device_id.clone();
         net_config.port = self.config.network_port;
         net_config.enable_encryption = true;  // 启用加密
+        net_config.enable_auth = false;  // 禁用引擎层认证（传输层已处理）
 
         let net_engine = bey_net::engine::TransportEngine::new(net_config).await
             .map_err(|e| ErrorInfo::new(2002, format!("初始化网络引擎失败: {:?}", e)))?;

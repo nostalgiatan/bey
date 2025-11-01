@@ -178,6 +178,7 @@ impl BeyFuncManager {
             ..Default::default()
         };
         engine_config.enable_encryption = true;
+        engine_config.enable_auth = false;  // 禁用引擎层认证（传输层已处理）
         let engine = bey_net::TransportEngine::new(engine_config).await
             .map_err(|e| ErrorInfo::new(7001, format!("创建网络引擎失败: {}", e))
                 .with_category(ErrorCategory::Network)
