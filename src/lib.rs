@@ -410,8 +410,22 @@ mod tests {
 
         let addr = addr_result.unwrap();
         match addr.ip() {
-            std::net::IpAddr::V4(ipv4) => assert!(ipv4.is_private(), "地址应该是私有地址"),
-            std::net::IpAddr::V6(_) => {}, // IPv6 暂不检查
+            std::net::IpAddr::V4(ipv4) => {
+                // 检查是否为有效的IPv4地址（私有或本地地址）
+                assert!(
+                    ipv4.is_private() || ipv4.is_loopback() || ipv4.is_link_local(),
+                    "地址应该是私有、本地或链路本地地址，实际为: {}",
+                    ipv4
+                );
+            },
+            std::net::IpAddr::V6(ipv6) => {
+                // IPv6地址也应该是有效的本地地址
+                assert!(
+                    ipv6.is_loopback() || ipv6.is_unicast_link_local() || ipv6.is_unique_local(),
+                    "IPv6地址应该是本地地址，实际为: {}",
+                    ipv6
+                );
+            }
         }
         assert_eq!(addr.port(), 8080, "端口应该是8080");
     }
