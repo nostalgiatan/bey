@@ -318,6 +318,8 @@ pub struct MdnsDiscoveryStats {
     pub successful_queries: u64,
     /// 失败查询次数
     pub failed_queries: u64,
+    /// 查询超时次数（无响应，正常情况）
+    pub query_timeouts: u64,
     /// 缓存命中次数
     pub cache_hits: u64,
     /// 缓存未命中次数
@@ -1239,10 +1241,10 @@ impl MdnsDiscovery {
             if start_time.elapsed() > timeout {
                 debug!("查询响应超时: {}ms (无其他设备响应，属正常情况)", timeout.as_millis());
 
-                // 更新统计 - 超时不算失败，而是正常的无响应情况
+                // 更新统计 - 超时是正常的无响应情况
                 {
                     let mut stats = self.stats.write().await;
-                    stats.cache_misses += 1;
+                    stats.query_timeouts += 1;
                 }
 
                 // 返回空响应列表，而不是错误（超时是正常情况）
