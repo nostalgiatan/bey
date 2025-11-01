@@ -187,6 +187,23 @@ impl BeyFuncManager {
         Self::new_with_engine(device_id, Arc::new(engine), storage_root).await
     }
 
+    /// 仅注册消息处理器（不启动网络服务器）
+    ///
+    /// 当网络服务器由外部管理时使用此方法
+    ///
+    /// # 返回值
+    ///
+    /// 返回注册结果
+    pub async fn register_handlers_only(&self) -> FuncResult<()> {
+        // 注册消息处理器
+        self.message.register_handlers(&self.engine).await?;
+        self.clipboard.register_handlers(&self.engine).await?;
+        self.storage_func.register_handlers(&self.engine).await?;
+
+        tracing::info!("BEY 分布式功能管理器处理器已注册: {}", self.device_id);
+        Ok(())
+    }
+
     /// 启动网络服务
     ///
     /// 启动网络引擎，开始接收和处理消息

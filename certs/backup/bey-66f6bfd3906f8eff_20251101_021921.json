@@ -1,0 +1,22 @@
+{
+  "certificate_id": "bey-66f6bfd3906f8eff",
+  "device_identifier": "bey-66f6bfd3906f8eff",
+  "fingerprint": "f901de9d21f44d412a6cfc086b0cacf4e75800b2596c81b8adcb4b53c7900f92",
+  "certificate_pem": "-----BEGIN CERTIFICATE-----\nMIIB9TCCAZugAwIBAgIUbfmmopkepCqvUCzYcI5dibJ1/6EwCgYIKoZIzj0EAwIw\nTDELMAkGA1UEBgwCQ04xDDAKBgNVBAoMA0JFWTEeMBwGA1UECwwVQ2VydGlmaWNh\ndGUgQXV0aG9yaXR5MQ8wDQYDVQQDDAZCRVkgQ0EwHhcNNzUwMTAxMDAwMDAwWhcN\nMjYxMTAxMDIxOTIxWjBLMQswCQYDVQQGDAJDTjEMMAoGA1UECgwDQkVZMQ8wDQYD\nVQQLDAZEZXZpY2UxHTAbBgNVBAMMFGJleS02NmY2YmZkMzkwNmY4ZWZmMFkwEwYH\nKoZIzj0CAQYIKoZIzj0DAQcDQgAELTsB9n+/WWtENseZ5cAT0sH9r8NkxyNr6bkT\nAHarm5trRXv29idbOhOtTGEbSrvIAzdRMbarfhKYmKCYCwqQT6NcMFowKQYDVR0R\nBCIwIIIeYmV5LTY2ZjZiZmQzOTA2ZjhlZmYuYmV5LmxvY2FsMA4GA1UdDwEB/wQE\nAwIFoDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwCgYIKoZIzj0EAwID\nSAAwRQIgMJevjyjLfP3OmcDofAdpvtuI+39/yaTFopvbtAMosxQCIQDUSUdyGw36\nQlbrplUR+EkuQ9mnduIv3XTr7+Kc+bmXFw==\n-----END CERTIFICATE-----\n",
+  "private_key_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgABSRgkiptZfI03wi\nb/5I5L82GpUwVFbxYmSI5fh9gfyhRANCAAQtOwH2f79Za0Q2x5nlwBPSwf2vw2TH\nI2vpuRMAdqubm2tFe/b2J1s6E61MYRtKu8gDN1Extqt+EpiYoJgLCpBP\n-----END PRIVATE KEY-----\n",
+  "issued_at": {
+    "secs_since_epoch": 1761963561,
+    "nanos_since_epoch": 248399667
+  },
+  "expires_at": {
+    "secs_since_epoch": 1793499561,
+    "nanos_since_epoch": 248399927
+  },
+  "certificate_type": "Device",
+  "issuer_identifier": "ca",
+  "subject_identifier": "CN=bey-66f6bfd3906f8eff, O=BEY, OU=Device",
+  "serial_number": null,
+  "status": "Valid",
+  "key_algorithm": "ECDSA-256",
+  "version": 3
+}

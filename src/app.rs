@@ -153,9 +153,9 @@ impl BeyAppManager {
                 .map_err(|e| ErrorInfo::new(2004, format!("启动网络服务失败: {:?}", e)))?;
         }
 
-        // 启动功能管理器
+        // 启动功能管理器（注册处理器但不重复启动网络服务器）
         if let Some(manager) = &self.func_manager {
-            manager.start().await
+            manager.register_handlers_only().await
                 .map_err(|e| ErrorInfo::new(2005, format!("启动功能管理器失败: {:?}", e)))?;
         }
 

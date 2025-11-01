@@ -57,7 +57,8 @@ impl CompleteMtlsManager {
         // 初始化证书管理器
         let certificate_config = bey_identity::CertificateConfig::builder()
             .with_validity_days(365)
-            .with_key_size(2048)
+            .with_key_algorithm("ECDSA")
+            .with_key_size(256)
             .with_ca_common_name(format!("{} CA", config.organization_name))
             .with_organization_name(&config.organization_name)
             .with_country_code(&config.country_code)

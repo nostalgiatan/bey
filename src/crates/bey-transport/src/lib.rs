@@ -245,7 +245,8 @@ impl SecureTransport {
         use bey_identity::config::CertificateConfig;
         let cert_config = CertificateConfig::builder()
             .with_validity_days(365)
-            .with_key_size(2048)
+            .with_key_algorithm("ECDSA")
+            .with_key_size(256)
             .with_ca_common_name("BEY Transport CA")
             .with_organization_name(&config.organization_name)
             .with_country_code(&config.country_code)

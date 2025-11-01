@@ -59,8 +59,8 @@ impl Default for CertificateConfigBuilder {
     fn default() -> Self {
         Self {
             validity_days: 365,
-            key_size: 2048,
-            key_algorithm: "RSA".to_string(),
+            key_size: 256,
+            key_algorithm: "ECDSA".to_string(),
             storage_directory: PathBuf::from("./certificates"),
             ca_common_name: "BEY Internal CA".to_string(),
             organization_name: "BEY".to_string(),

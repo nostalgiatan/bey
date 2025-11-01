@@ -894,7 +894,15 @@ impl MdnsDiscovery {
             (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT)
         };
 
-        let socket_addr: SocketAddr = format!("{}:{}", target_addr.0, target_addr.1).parse::<SocketAddr>().map_err(|e| {
+        let socket_addr_str = if target_addr.0.contains(':') {
+            // IPv6地址需要用方括号包围
+            format!("[{}]:{}", target_addr.0, target_addr.1)
+        } else {
+            // IPv4地址直接使用
+            format!("{}:{}", target_addr.0, target_addr.1)
+        };
+
+        let socket_addr: SocketAddr = socket_addr_str.parse::<SocketAddr>().map_err(|e| {
             ErrorInfo::new(2118, format!("解析目标地址{}:{}失败: {}", target_addr.0, target_addr.1, e))
                 .with_category(ErrorCategory::Network)
                 .with_severity(ErrorSeverity::Error)
@@ -1036,7 +1044,15 @@ impl MdnsDiscovery {
             (mdns_constants::MDNS_IPV4_MULTICAST, mdns_constants::MDNS_PORT)
         };
 
-        let socket_addr: SocketAddr = format!("{}:{}", target_addr.0, target_addr.1).parse::<SocketAddr>().map_err(|e| {
+        let socket_addr_str = if target_addr.0.contains(':') {
+            // IPv6地址需要用方括号包围
+            format!("[{}]:{}", target_addr.0, target_addr.1)
+        } else {
+            // IPv4地址直接使用
+            format!("{}:{}", target_addr.0, target_addr.1)
+        };
+
+        let socket_addr: SocketAddr = socket_addr_str.parse::<SocketAddr>().map_err(|e| {
             ErrorInfo::new(2120, format!("解析目标地址{}:{}失败: {}", target_addr.0, target_addr.1, e))
                 .with_category(ErrorCategory::Network)
                 .with_severity(ErrorSeverity::Error)
