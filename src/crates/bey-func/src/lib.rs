@@ -101,28 +101,22 @@ pub struct BeyFuncManager {
 }
 
 impl BeyFuncManager {
-    /// 创建新的分布式功能管理器
+    /// 使用现有网络引擎创建分布式功能管理器
     ///
     /// # 参数
     ///
     /// * `device_id` - 设备唯一标识
+    /// * `engine` - 网络传输引擎实例
     /// * `storage_root` - 存储根目录
     ///
     /// # 返回值
     ///
     /// 返回管理器实例或错误
-    pub async fn new(device_id: &str, storage_root: &str) -> FuncResult<Self> {
-        // 初始化网络引擎
-        let mut engine_config = bey_net::EngineConfig {
-            name: device_id.to_string(),
-            ..Default::default()
-        };
-        engine_config.enable_encryption = false;  // 暂时禁用加密以便测试
-        let engine = bey_net::TransportEngine::new(engine_config).await
-            .map_err(|e| ErrorInfo::new(7001, format!("创建网络引擎失败: {}", e))
-                .with_category(ErrorCategory::Network)
-                .with_severity(ErrorSeverity::Error))?;
-
+    pub async fn new_with_engine(
+        device_id: &str,
+        engine: Arc<bey_net::TransportEngine>,
+        storage_root: &str,
+    ) -> FuncResult<Self> {
         // 初始化存储管理器
         let storage = bey_storage::UnifiedStorageManager::new(
             device_id.to_string(),
@@ -132,7 +126,6 @@ impl BeyFuncManager {
                 .with_category(ErrorCategory::Storage)
                 .with_severity(ErrorSeverity::Error))?;
 
-        let engine = Arc::new(engine);
         let storage = Arc::new(storage);
 
         // 创建功能模块
@@ -161,6 +154,36 @@ impl BeyFuncManager {
             clipboard,
             storage_func,
         })
+    }
+
+    /// 创建新的分布式功能管理器（包含独立的网络引擎）
+    ///
+    /// # 参数
+    ///
+    /// * `device_id` - 设备唯一标识
+    /// * `storage_root` - 存储根目录
+    ///
+    /// # 返回值
+    ///
+    /// 返回管理器实例或错误
+    ///
+    /// # 注意
+    ///
+    /// 此方法会创建独立的网络引擎实例。如果在同一进程中需要多个管理器，
+    /// 建议使用 `new_with_engine()` 方法共享同一个引擎实例。
+    pub async fn new(device_id: &str, storage_root: &str) -> FuncResult<Self> {
+        // 初始化网络引擎
+        let mut engine_config = bey_net::EngineConfig {
+            name: device_id.to_string(),
+            ..Default::default()
+        };
+        engine_config.enable_encryption = true;
+        let engine = bey_net::TransportEngine::new(engine_config).await
+            .map_err(|e| ErrorInfo::new(7001, format!("创建网络引擎失败: {}", e))
+                .with_category(ErrorCategory::Network)
+                .with_severity(ErrorSeverity::Error))?;
+
+        Self::new_with_engine(device_id, Arc::new(engine), storage_root).await
     }
 
     /// 启动网络服务

@@ -105,22 +105,27 @@ impl BeyAppManager {
         std::fs::create_dir_all(&self.config.storage_path)
             .map_err(|e| ErrorInfo::new(2001, format!("创建存储目录失败: {}", e)))?;
 
-        // 初始化网络引擎
+        // 初始化网络引擎（只创建一次）
         let device_id = self.core_app.local_device().device_id.clone();
         let mut net_config = bey_net::engine::EngineConfig::default();
         net_config.name = device_id.clone();
         net_config.port = self.config.network_port;
-        net_config.enable_encryption = false;  // 暂时禁用加密以便测试
+        net_config.enable_encryption = true;  // 启用加密
 
         let net_engine = bey_net::engine::TransportEngine::new(net_config).await
             .map_err(|e| ErrorInfo::new(2002, format!("初始化网络引擎失败: {:?}", e)))?;
         
-        self.net_engine = Some(Arc::new(net_engine));
+        let engine_arc = Arc::new(net_engine);
+        self.net_engine = Some(Arc::clone(&engine_arc));
 
-        // 初始化功能管理器
+        // 初始化功能管理器（使用共享的引擎实例）
         let storage_path = self.config.storage_path.as_str();
         
-        let func_manager = bey_func::BeyFuncManager::new(&device_id, storage_path).await
+        let func_manager = bey_func::BeyFuncManager::new_with_engine(
+            &device_id,
+            Arc::clone(&engine_arc),
+            storage_path
+        ).await
             .map_err(|e| ErrorInfo::new(2003, format!("初始化功能管理器失败: {:?}", e)))?;
         
         self.func_manager = Some(Arc::new(func_manager));

@@ -237,6 +237,10 @@ impl SecureTransport {
     pub async fn new(config: TransportConfig, device_id: String) -> TransportResult<Self> {
         info!("初始化安全传输层，设备ID: {}", device_id);
 
+        // 安装 Rustls CryptoProvider（使用 ring）
+        // 只安装一次，多次调用是安全的
+        let _ = rustls::crypto::ring::default_provider().install_default();
+
         // 创建证书管理器
         use bey_identity::config::CertificateConfig;
         let cert_config = CertificateConfig::builder()
