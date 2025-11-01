@@ -20,9 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(feature = "gui")]
     {
         tracing::info!("启动 GUI 模式");
-        // TODO: 实现 GUI 模式
-        eprintln!("GUI 模式尚未实现");
-        return Err("GUI 模式尚未实现".into());
+        run_gui(config).await?;
     }
 
     #[cfg(all(feature = "tui", not(feature = "gui")))]
@@ -65,15 +63,35 @@ fn load_config() -> Result<AppConfig, Box<dyn std::error::Error>> {
 
 /// GUI 模块（使用 Tauri）
 #[cfg(feature = "gui")]
-mod gui {
-    use super::*;
+async fn run_gui(config: AppConfig) -> Result<(), Box<dyn std::error::Error>> {
+    use bey_gui::GuiApp;
+    
+    tracing::info!("启动 GUI 模式");
 
-    pub async fn run(config: AppConfig) -> Result<(), Box<dyn std::error::Error>> {
-        tracing::info!("GUI 模式尚未实现，将在 bey-gui crate 中实现");
-        // GUI 将在 src/crates/bey-gui 中使用 Tauri 实现
-        println!("GUI 模式：请等待 bey-gui 模块完成");
-        Ok(())
-    }
+    // 创建应用程序管理器
+    let mut manager = BeyAppManager::new(config).await?;
+
+    // 初始化所有模块
+    manager.initialize().await?;
+    tracing::info!("应用程序初始化完成");
+
+    // 启动应用程序
+    manager.start().await?;
+    tracing::info!("应用程序已启动");
+
+    // 创建并运行 GUI
+    let func_manager = manager.func_manager().clone();
+    let gui_app = GuiApp::new(func_manager);
+    
+    // 运行 GUI
+    let result = gui_app.run().await;
+
+    // 停止应用程序
+    tracing::info!("正在关闭应用程序...");
+    manager.stop().await?;
+    tracing::info!("应用程序已停止");
+
+    result.map_err(|e| e.to_string().into())
 }
 
 /// TUI 模块（使用 ratatui）
