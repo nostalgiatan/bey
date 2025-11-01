@@ -1,3 +1,5 @@
+# Build artifacts - exclude all target directories recursively
+**/target/
 /target
 target/
 *.db
