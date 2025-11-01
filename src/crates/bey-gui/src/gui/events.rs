@@ -5,6 +5,7 @@
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use serde::Serialize;
+use chrono::Utc;
 
 /// 事件发射器
 ///
@@ -33,7 +34,7 @@ impl EventEmitter {
             "sync_type": sync_type,
             "device_id": device_id,
             "data": data,
-            "timestamp": chrono::Utc::now().timestamp(),
+            "timestamp": Utc::now().timestamp(),
         });
 
         self.app_handle
@@ -90,7 +91,7 @@ impl EventEmitter {
             "from_device_name": from_device_name,
             "content": content,
             "message_type": message_type,
-            "timestamp": chrono::Utc::now().timestamp(),
+            "timestamp": Utc::now().timestamp(),
             "is_read": false,
         });
 
@@ -116,7 +117,7 @@ impl EventEmitter {
             "from_device": from_device,
             "from_device_name": from_device_name,
             "file_type": file_type,
-            "timestamp": chrono::Utc::now().timestamp(),
+            "timestamp": Utc::now().timestamp(),
             "progress": 0,
         });
 
@@ -165,7 +166,7 @@ impl EventEmitter {
             "notification_type": notification_type,
             "title": title,
             "message": message,
-            "timestamp": chrono::Utc::now().timestamp(),
+            "timestamp": Utc::now().timestamp(),
         });
 
         self.app_handle
