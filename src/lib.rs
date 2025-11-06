@@ -61,6 +61,9 @@
 // 导出应用程序模块
 pub mod app;
 
+// 导出 Tauri API 模块
+pub mod tauri_api;
+
 use error::{ErrorInfo, ErrorCategory};
 use sys::SystemInfo;
 use std::net::SocketAddr;
